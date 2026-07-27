@@ -39,14 +39,21 @@ as an open decision — fill these in once that's decided.
 
 ## M1 — IconLens Tool Window
 
-Status: NOT STARTED
+Status: DONE
 
-- [ ] Register IconLens Tool Window
-- [ ] Display minimal empty state
-- [ ] Follow native IntelliJ UI conventions
-- [ ] Verify Tool Window opens correctly
+- [x] Register IconLens Tool Window
+- [x] Display minimal empty state
+- [x] Follow native IntelliJ UI conventions
+- [x] Verify Tool Window opens correctly
 
 No drawable scanning yet.
+
+Verified: plugin loads and the `IconLens` tool window extension registers with no
+errors in a sandbox run, both with no project open and with this project opened
+(`ProjectUtil - Opening existing project` in idea.log, zero ERROR-level log lines).
+Tool window content is created lazily on first click per platform convention, which
+this headless verification can't drive — a manual `./gradlew runIde` + click on the
+IconLens stripe icon is the last visual check before relying on this further.
 
 ---
 
