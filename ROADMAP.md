@@ -59,16 +59,18 @@ IconLens stripe icon is the last visual check before relying on this further.
 
 ## M2 — Drawable Discovery
 
-Status: NOT STARTED
+Status: DONE
 
-- [ ] Define IconSource
-- [ ] Define IconResource
-- [ ] Implement DrawableIconSource
-- [ ] Discover drawable resources
-- [ ] Handle relevant drawable resource directories
-- [ ] Avoid assuming only one Android module
-- [ ] Run discovery outside expensive EDT work
-- [ ] Add resource-discovery tests where practical
+- [x] Define IconSource
+- [x] Define IconResource
+- [x] Implement DrawableIconSource
+- [x] Discover drawable resources
+- [x] Handle relevant drawable resource directories
+- [x] Avoid assuming only one Android module
+- [x] Run discovery outside expensive EDT work
+- [x] Add resource-discovery tests where practical
+
+Verified: 8 classifier tests + 5 representative-picker tests + 2 DrawableIconSource integration tests, all passing (`./gradlew test`); full `./gradlew build` green.
 
 ---
 
