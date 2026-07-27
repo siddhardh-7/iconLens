@@ -16,19 +16,24 @@ Platform:
 
 ## M0 — Bootstrap
 
-Status: IN PROGRESS
+Status: DONE
 
 - [x] Create IntelliJ Platform plugin project
 - [x] Configure JDK/JBR 21 development environment
 - [x] Verify generated project builds
-- [ ] Target Android Studio Quail instead of IntelliJ IDEA
-- [ ] Verify plugin packaging
-- [ ] Launch sandbox Android Studio using `runIde`
-- [ ] Verify plugin loads
+- [x] Target Android Studio Quail instead of IntelliJ IDEA
+- [x] Verify plugin packaging
+- [x] Launch sandbox Android Studio using `runIde`
+- [x] Verify plugin loads
 
 Definition of done:
 
 The plugin builds and loads successfully in the target development IDE.
+
+Known follow-up (not part of M0's platform-targeting scope): `plugin.xml` still has
+the JetBrains template's placeholder `<description>` and `<vendor>` values, which
+`verifyPlugin` flags as invalid. `PRODUCT.md` already marks vendor/branding identity
+as an open decision — fill these in once that's decided.
 
 ---
 
