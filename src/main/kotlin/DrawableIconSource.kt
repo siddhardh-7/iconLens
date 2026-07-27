@@ -43,21 +43,25 @@ class DrawableIconSource(private val project: Project) : IconSource {
 
     private fun collectDrawableDirs(resDir: VirtualFile, moduleName: String, out: MutableList<DrawableCandidate>) {
         for (qualifierDir in resDir.children) {
-            if (!qualifierDir.isDirectory || !DRAWABLE_DIR_REGEX.matches(qualifierDir.name)) continue
-            for (file in qualifierDir.children) {
-                if (file.isDirectory) continue
-                try {
-                    val type = resolveIconResourceType(file.name) ?: continue
-                    out += DrawableCandidate(
-                        moduleName = moduleName,
-                        qualifierDirName = qualifierDir.name,
-                        baseName = file.name.substringBeforeLast('.'),
-                        type = type,
-                        file = file,
-                    )
-                } catch (e: Exception) {
-                    LOG.warn("Skipping unreadable drawable candidate: ${file.path}", e)
+            try {
+                if (!qualifierDir.isDirectory || !DRAWABLE_DIR_REGEX.matches(qualifierDir.name)) continue
+                for (file in qualifierDir.children) {
+                    try {
+                        if (file.isDirectory) continue
+                        val type = resolveIconResourceType(file.name) ?: continue
+                        out += DrawableCandidate(
+                            moduleName = moduleName,
+                            qualifierDirName = qualifierDir.name,
+                            baseName = file.name.substringBeforeLast('.'),
+                            type = type,
+                            file = file,
+                        )
+                    } catch (e: Exception) {
+                        LOG.warn("Skipping unreadable drawable candidate: ${file.path}", e)
+                    }
                 }
+            } catch (e: Exception) {
+                LOG.warn("Skipping unreadable drawable directory: ${qualifierDir.path}", e)
             }
         }
     }
