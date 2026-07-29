@@ -2,6 +2,7 @@ package io.github.siddhardh7.iconlens
 
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.logger
+import kotlinx.coroutines.CancellationException
 import java.awt.BasicStroke
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -23,6 +24,8 @@ class DrawableIconRenderer : IconRenderer {
                 IconResourceType.VECTOR_DRAWABLE -> decodeVector(bytes)
             }
             RenderedIcon.Rendered(resource, image)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             LOG.warn("Failed to render ${resource.name}", e)
             RenderedIcon.Failed(resource, e.message ?: e.javaClass.simpleName)

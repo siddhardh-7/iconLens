@@ -3,6 +3,10 @@ package io.github.siddhardh7.iconlens
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -61,5 +65,25 @@ class DrawableIconRendererTest : BasePlatformTestCase() {
         val result = runBlocking { DrawableIconRenderer().render(resource) }
 
         assertTrue(result is RenderedIcon.Failed)
+    }
+
+    fun testPropagatesCancellationInsteadOfConvertingToFailed() {
+        val file = writePngResource("ic_cancel_test.png")
+        val resource = IconResource("ic_cancel_test", IconResourceType.PNG, file, "app")
+        val renderer = DrawableIconRenderer()
+
+        var threw = false
+        runBlocking {
+            val job = launch(start = CoroutineStart.UNDISPATCHED) {
+                try {
+                    renderer.render(resource)
+                } catch (e: CancellationException) {
+                    threw = true
+                    throw e
+                }
+            }
+            job.cancelAndJoin()
+        }
+        assertTrue(threw)
     }
 }
