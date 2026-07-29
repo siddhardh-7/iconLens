@@ -76,14 +76,16 @@ Verified: 8 classifier tests + 5 representative-picker tests + 2 DrawableIconSou
 
 ## M3 — Rendering & Gallery
 
-Status: NOT STARTED
+Status: DONE
 
-- [ ] Render supported raster resources
-- [ ] Render supported VectorDrawables
-- [ ] Gracefully handle unsupported/malformed resources
-- [ ] Display project icon gallery
-- [ ] Display resource names
-- [ ] Add filename filtering
+- [x] Render supported raster resources
+- [x] Render supported VectorDrawables
+- [x] Gracefully handle unsupported/malformed resources
+- [x] Display project icon gallery
+- [x] Display resource names
+- [x] Add filename filtering
+
+Verified: 13 PathDataInterpreter tests + 9 VectorDrawableParser tests + 4 DrawableIconRenderer tests + 3 IconGalleryModel tests, all passing (`./gradlew test`); full `./gradlew build` green.
 
 ---
 

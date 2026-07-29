@@ -99,3 +99,39 @@ this can be revisited if it proves too imprecise on real multi-flavor projects.
 `discover()` performs its VFS/module-model reads inside `readAction { }`, so it never
 blocks the EDT. A single unreadable/malformed candidate is caught, logged, and
 skipped — it never aborts the whole scan.
+
+---
+
+# RenderedIcon
+
+`RenderedIcon` is what `IconRenderer` produces — a sealed result, not an exception path,
+so a single malformed/unsupported resource can never break the batch:
+
+```kotlin
+sealed interface RenderedIcon {
+    val resource: IconResource
+
+    data class Rendered(override val resource: IconResource, val image: BufferedImage) : RenderedIcon
+    data class Failed(override val resource: IconResource, val reason: String) : RenderedIcon
+}
+
+interface IconRenderer {
+    suspend fun render(resource: IconResource): RenderedIcon
+}
+```
+
+---
+
+# DrawableIconRenderer
+
+`DrawableIconRenderer` is the first concrete `IconRenderer`. It decodes PNG/JPEG (and
+WebP, where the platform's `ImageIO` can) via the JDK's `ImageIO`, and VectorDrawable
+XML via a hand-written `PathDataInterpreter`/`VectorDrawableParser` pair supporting a
+deliberate subset: `<vector>`/`<path>`/`<group>`, solid fill/stroke colors, and basic
+group transforms. Gradients, clip-paths, and animated-vector-drawable wrappers are
+unsupported by design, not by oversight — see
+`docs/superpowers/specs/2026-07-28-rendering-gallery-design.md`.
+
+All rendering runs off the EDT; `IconGalleryModel.loadGallery`/`filterByName` keep the
+gallery's load-and-filter logic Swing-free, so `IconLensToolWindowFactory` only ever
+displays a list it's handed.
