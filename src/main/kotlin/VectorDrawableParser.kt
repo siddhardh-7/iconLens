@@ -86,9 +86,10 @@ private fun AffineTransform.groupTransform(group: Element): AffineTransform {
     val pivotY = group.attribute("android:pivotY")?.toDoubleOrNull() ?: 0.0
 
     val result = AffineTransform(this)
-    result.translate(translateX, translateY)
-    result.rotate(Math.toRadians(rotation), pivotX, pivotY)
+    result.translate(translateX + pivotX, translateY + pivotY)
+    result.rotate(Math.toRadians(rotation))
     result.scale(scaleX, scaleY)
+    result.translate(-pivotX, -pivotY)
     return result
 }
 

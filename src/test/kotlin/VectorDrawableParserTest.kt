@@ -62,6 +62,24 @@ class VectorDrawableParserTest {
     }
 
     @Test
+    fun `applies group scale around pivot to child path`() {
+        val xml = """
+            <vector xmlns:android="http://schemas.android.com/apk/res/android"
+                android:viewportWidth="10" android:viewportHeight="10">
+                <group android:scaleX="2" android:scaleY="1" android:pivotX="2" android:pivotY="0">
+                    <path android:fillColor="#000000" android:pathData="M0,0"/>
+                </group>
+            </vector>
+        """.trimIndent()
+
+        val shape = parseVectorDrawable(xml)
+        val point = shape.paths.single().path.currentPoint!!
+
+        assertEquals(-2.0, point.x, 0.0001)
+        assertEquals(0.0, point.y, 0.0001)
+    }
+
+    @Test
     fun `missing viewport dimensions is unsupported`() {
         assertThrows(UnsupportedVectorDrawableException::class.java) {
             parseVectorDrawable("<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"/>")
