@@ -5,8 +5,11 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBList
@@ -20,14 +23,17 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.awt.BorderLayout
 import java.awt.Component
+import java.awt.datatransfer.DataFlavor
 import javax.swing.BorderFactory
 import javax.swing.BoxLayout
 import javax.swing.DefaultListModel
 import javax.swing.ImageIcon
+import javax.swing.JButton
 import javax.swing.JLabel
 import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.ListCellRenderer
+import javax.swing.TransferHandler
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
@@ -78,13 +84,86 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         }
         toolWindow.setTitleActions(listOf(refreshAction))
 
+        val queryPreviewLabel = JLabel(IconLensBundle.message("toolwindow.IconLens.queryEmpty")).apply {
+            horizontalAlignment = JLabel.CENTER
+        }
+        val querySourceLabel = JLabel(" ")
+
+        fun showQueryImage(result: QueryImage) {
+            when (result) {
+                is QueryImage.Loaded -> {
+                    queryPreviewLabel.icon = ImageIcon(result.image)
+                    queryPreviewLabel.text = null
+                    querySourceLabel.text = result.sourceDescription
+                }
+                is QueryImage.Failed -> {
+                    queryPreviewLabel.icon = AllIcons.General.Warning
+                    queryPreviewLabel.text = null
+                    querySourceLabel.text = result.reason
+                }
+            }
+        }
+
+        fun loadAndShow(load: () -> QueryImage?) {
+            scope.launch {
+                val result = load() ?: return@launch
+                ApplicationManager.getApplication().invokeLater { showQueryImage(result) }
+            }
+        }
+
+        val pasteButton = JButton(IconLensBundle.message("toolwindow.IconLens.paste")).apply {
+            addActionListener { loadAndShow(::loadQueryImageFromClipboard) }
+        }
+
+        val chooseFileButton = JButton(IconLensBundle.message("toolwindow.IconLens.chooseFile")).apply {
+            addActionListener {
+                val descriptor = FileChooserDescriptor(true, false, false, false, false, false)
+                    .withFileFilter { it.extension?.lowercase() in setOf("png", "jpg", "jpeg", "webp") }
+                val chosen = FileChooser.chooseFile(descriptor, project, null) ?: return@addActionListener
+                val file = VfsUtilCore.virtualToIoFile(chosen)
+                loadAndShow { loadQueryImageFromFile(file) }
+            }
+        }
+
+        val queryPreviewArea = JPanel(BorderLayout()).apply {
+            add(queryPreviewLabel, BorderLayout.CENTER)
+            transferHandler = object : TransferHandler() {
+                override fun canImport(support: TransferSupport) =
+                    support.isDataFlavorSupported(DataFlavor.imageFlavor) ||
+                        support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
+
+                override fun importData(support: TransferSupport): Boolean {
+                    if (!canImport(support)) return false
+                    loadAndShow { loadQueryImageFromTransferable(support.transferable, "Dropped image") }
+                    return true
+                }
+            }
+        }
+
+        val queryButtonsPanel = JPanel().apply {
+            add(pasteButton)
+            add(chooseFileButton)
+        }
+
+        val queryPanel = JPanel(BorderLayout()).apply {
+            add(queryPreviewArea, BorderLayout.CENTER)
+            add(querySourceLabel, BorderLayout.SOUTH)
+            add(queryButtonsPanel, BorderLayout.EAST)
+        }
+
         val filterPanel = JPanel(BorderLayout()).apply {
             add(JLabel(IconLensBundle.message("toolwindow.IconLens.filterLabel")), BorderLayout.WEST)
             add(filterField, BorderLayout.CENTER)
         }
 
+        val topPanel = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            add(queryPanel)
+            add(filterPanel)
+        }
+
         val panel = JPanel(BorderLayout()).apply {
-            add(filterPanel, BorderLayout.NORTH)
+            add(topPanel, BorderLayout.NORTH)
             add(JBScrollPane(list), BorderLayout.CENTER)
         }
 
