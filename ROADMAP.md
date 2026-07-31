@@ -123,15 +123,24 @@ also remain unsupported pending real-world evidence they're needed.
 
 ## M5 — Normalization
 
-Status: NOT STARTED
+Status: DONE
 
-- [ ] Introduce RenderedIcon
-- [ ] Introduce NormalizedIcon
-- [ ] Normalize canvas dimensions
-- [ ] Preserve aspect ratio
-- [ ] Center content
-- [ ] Normalize padding/transparency as needed
-- [ ] Add normalization tests
+- [x] Introduce NormalizedIcon
+- [x] Normalize canvas dimensions
+- [x] Preserve aspect ratio
+- [x] Center content
+- [x] Normalize padding/transparency as needed
+- [x] Add normalization tests
+
+`RenderedIcon`/`QueryImage` images become a canonical, comparable `NormalizedIcon`:
+content is cropped to its non-transparent bounds, fit-centered into a 64x64 canvas
+(not stretched), and composited onto a white background. Not wired into the
+gallery/query UI this milestone — see
+`docs/superpowers/specs/2026-07-31-normalization-design.md`.
+
+Verified: 4 IconFitScalingTest + 5 CenteredImageNormalizerTest new tests (77 tests
+total across the suite), all passing (`./gradlew test`); full `./gradlew build`
+green.
 
 ---
 

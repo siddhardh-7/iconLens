@@ -184,3 +184,44 @@ larger size for a crisper result) — one parser, one renderer, two callers.
 drag-and-drop) is the only consumer today, and it is not wired to anything else —
 choosing or pasting a query image has no effect on the gallery below it. Comparing
 the query against indexed resources is `SimilarityEngine` work, starting at M6.
+
+---
+
+# NormalizedIcon
+
+`NormalizedIcon` is what `ImageNormalizer` produces from any `BufferedImage` —
+a gallery `RenderedIcon.Rendered.image`, or (once query images need to be
+compared, M6) a `QueryImage.Loaded.image`. It has no knowledge of where that
+image came from:
+
+```kotlin
+data class NormalizedIcon(val image: BufferedImage)
+```
+
+`image` is always exactly 64x64 (`NORMALIZED_SIZE`), fully opaque, with content
+cropped to its non-transparent bounds, fit-centered (not stretched), and
+composited onto a white background — so two icons authored with different
+amounts of baked-in padding, or decoded from sources of very different native
+sizes, become directly comparable pixel grids for whichever M6 similarity
+technique gets picked (perceptual hash, difference hash, or edge/shape
+comparison — all still open per `PRD.md`).
+
+```kotlin
+interface ImageNormalizer {
+    fun normalize(image: BufferedImage): NormalizedIcon
+}
+```
+
+`CenteredImageNormalizer` is the only concrete implementation. Not `suspend` —
+it is deterministic, synchronous pixel work on an already-decoded image already
+in memory, the same pattern as `DrawableIconRenderer`'s private decode helpers.
+
+The "uniform scale-to-fit, centered" arithmetic used by `CenteredImageNormalizer`,
+`DrawableIconRenderer.scaleToSquare`, and
+`VectorDrawableRendering.renderVectorDrawable` is one shared function,
+`fitScaleAndOffset` in `IconFitScaling.kt`, not three copies of the same formula.
+
+`NormalizedIcon`/`ImageNormalizer` are not wired into the gallery UI or the query
+panel — they are an internal artifact for the future `SimilarityEngine` (M6+), not
+a display concern. See
+`docs/superpowers/specs/2026-07-31-normalization-design.md` for full rationale.
