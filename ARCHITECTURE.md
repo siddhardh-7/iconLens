@@ -126,12 +126,61 @@ interface IconRenderer {
 
 `DrawableIconRenderer` is the first concrete `IconRenderer`. It decodes PNG/JPEG (and
 WebP, where the platform's `ImageIO` can) via the JDK's `ImageIO`, and VectorDrawable
-XML via a hand-written `PathDataInterpreter`/`VectorDrawableParser` pair supporting a
-deliberate subset: `<vector>`/`<path>`/`<group>`, solid fill/stroke colors, and basic
-group transforms. Gradients, clip-paths, and animated-vector-drawable wrappers are
+XML via a hand-written `PathDataInterpreter`/`VectorDrawableParser` pair supporting
+`<vector>`/`<path>`/`<group>`/`<clip-path>`, solid fill/stroke colors (3/4/6/8-digit
+hex), `android:fillType="evenOdd"` winding, linear-gradient fills via `<aapt:attr>`,
+and group transforms. Animated-vector-drawable wrappers, radial/sweep gradients, and
+non-vector drawable XML (`<shape>`, `<selector>`, `<layer-list>` — misclassified as
+`VECTOR_DRAWABLE` today since `IconResource` classifies by extension only) remain
 unsupported by design, not by oversight — see
-`docs/superpowers/specs/2026-07-28-rendering-gallery-design.md`.
+`docs/superpowers/specs/2026-07-28-rendering-gallery-design.md`. Both raster and
+vector rendering fit non-square sources into the render square (uniform scale,
+centered, transparent margins) instead of stretching them to fill it.
 
 All rendering runs off the EDT; `IconGalleryModel.loadGallery`/`filterByName` keep the
 gallery's load-and-filter logic Swing-free, so `IconLensToolWindowFactory` only ever
 displays a list it's handed.
+
+---
+
+# QueryImage / QueryImageLoading
+
+M4 adds the other input the eventual `SimilarityEngine` will need: not a project
+resource, but a query image the developer supplies from outside the project (a
+screenshot, a file they're about to add, an icon copied from a design tool). This is
+a separate acquisition path, not a variant of `IconSource`/`IconRenderer` — nothing
+about it assumes the image originated from an Android project or ever will.
+
+```kotlin
+sealed interface QueryImage {
+    data class Loaded(val image: BufferedImage, val sourceDescription: String) : QueryImage
+    data class Failed(val reason: String) : QueryImage
+}
+```
+
+`QueryImageLoading.kt` provides three loaders, all returning `QueryImage` (or `null`
+only when there is genuinely nothing to load, e.g. an empty clipboard):
+
+- `loadQueryImageFromFile(file)` — dispatches by extension: `ImageIO` for
+  PNG/JPEG/WebP, the shared vector renderer (below) for `.xml` (VectorDrawable), and
+  IntelliJ Platform's bundled `com.intellij.util.SVGLoader` for `.svg` — a core
+  platform module, not a new dependency. SVGs with no explicit width/height are
+  re-rendered at a higher scale instead of staying blurry.
+- `loadQueryImageFromTransferable(transferable, sourceDescription)` — backs both
+  paste and drag-and-drop. Tries `DataFlavor.imageFlavor` (raw image data), then
+  `DataFlavor.javaFileListFlavor` (delegates to `loadQueryImageFromFile`), then
+  `DataFlavor.stringFlavor` sniffed for a leading `<svg`/`<vector` tag — covering a
+  "copy SVG code" clipboard action, which puts plain text on the clipboard, not an
+  image or a file.
+- `loadQueryImageFromClipboard()` — reads the system clipboard and delegates to
+  `loadQueryImageFromTransferable`.
+
+VectorDrawable XML rendering is shared, not duplicated: `VectorDrawableRendering.kt`'s
+`renderVectorDrawable(xml, size)` is called by both `DrawableIconRenderer.decodeVector`
+(gallery tiles, the fixed `RENDER_SIZE`) and `QueryImageLoading` (query preview, a
+larger size for a crisper result) — one parser, one renderer, two callers.
+
+`IconLensToolWindowFactory`'s query panel (Paste / Choose file... / Clear, plus
+drag-and-drop) is the only consumer today, and it is not wired to anything else —
+choosing or pasting a query image has no effect on the gallery below it. Comparing
+the query against indexed resources is `SimilarityEngine` work, starting at M6.

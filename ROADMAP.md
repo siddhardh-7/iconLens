@@ -91,14 +91,33 @@ Verified: 13 PathDataInterpreter tests + 9 VectorDrawableParser tests + 4 Drawab
 
 ## M4 — Query Input
 
-Status: IN PROGRESS
+Status: DONE
 
 - [x] Query preview
 - [x] Clipboard image input
 - [x] Drag and drop
 - [x] Image file selection
 
-At least one reliable query-input path is required before proceeding.
+Query images support PNG/WebP/JPEG (`ImageIO`), VectorDrawable XML and SVG (shared
+vector renderer / IntelliJ's bundled `SVGLoader`), and raw SVG/VectorDrawable markup
+pasted as plain text (e.g. a "copy SVG code" action). A Clear button resets the query
+and the name filter.
+
+Verified: 14 QueryImageLoadingTest + 16 VectorDrawableParserTest +
+1 VectorDrawableRenderingTest + 6 DrawableIconRendererTest tests (68 tests total across
+the suite), all passing (`./gradlew test`); full `./gradlew build` green. Also verified
+directly against real-world icons from an external Android project (KYN): fixed a
+concurrency race between overlapping paste/choose/drop loads, a post-disposal UI
+mutation, an uncaught clipboard exception, unscaled preview images ballooning the
+layout, blocking I/O on the wrong dispatcher, incomplete drop-target coverage,
+duplicated file-filter logic, 3/4-digit hex colors, `evenOdd` fill winding,
+`<clip-path>`, linear gradients, and non-square icons being stretched instead of fit.
+
+Known gap, deliberately out of scope: `.xml` files are classified as `VECTOR_DRAWABLE`
+by extension alone, so non-vector drawable XML (`<shape>`, `<selector>`,
+`<layer-list>`) still fails to render — fixing this needs content-based
+classification, a bigger scope decision than a parser fix. Radial/sweep gradients
+also remain unsupported pending real-world evidence they're needed.
 
 ---
 
