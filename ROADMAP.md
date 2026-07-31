@@ -91,12 +91,12 @@ Verified: 13 PathDataInterpreter tests + 9 VectorDrawableParser tests + 4 Drawab
 
 ## M4 — Query Input
 
-Status: NOT STARTED
+Status: IN PROGRESS
 
-- [ ] Query preview
-- [ ] Clipboard image input
-- [ ] Drag and drop
-- [ ] Image file selection
+- [x] Query preview
+- [x] Clipboard image input
+- [x] Drag and drop
+- [x] Image file selection
 
 At least one reliable query-input path is required before proceeding.
 
