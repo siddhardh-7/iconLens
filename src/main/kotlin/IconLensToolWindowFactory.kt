@@ -23,6 +23,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.awt.BorderLayout
 import java.awt.Component
+import java.awt.Dimension
+import java.awt.Font
 import java.awt.Image
 import java.awt.image.BufferedImage
 import javax.swing.BorderFactory
@@ -35,6 +37,7 @@ import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.ListCellRenderer
 import javax.swing.TransferHandler
+import javax.swing.UIManager
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
@@ -126,6 +129,14 @@ class IconLensToolWindowFactory : ToolWindowFactory {
             }
         }
 
+        fun clearQuery() {
+            latestRequestId++
+            queryPreviewLabel.icon = null
+            queryPreviewLabel.text = IconLensBundle.message("toolwindow.IconLens.queryEmpty")
+            querySourceLabel.text = " "
+            filterField.text = ""
+        }
+
         val pasteButton = JButton(IconLensBundle.message("toolwindow.IconLens.paste")).apply {
             addActionListener { loadAndShow(::loadQueryImageFromClipboard) }
         }
@@ -149,6 +160,10 @@ class IconLensToolWindowFactory : ToolWindowFactory {
             }
         }
 
+        val clearButton = JButton(IconLensBundle.message("toolwindow.IconLens.clear")).apply {
+            addActionListener { clearQuery() }
+        }
+
         val queryDropHandler = object : TransferHandler() {
             override fun canImport(support: TransferSupport) =
                 SUPPORTED_TRANSFERABLE_FLAVORS.any { support.isDataFlavorSupported(it) }
@@ -170,6 +185,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         val queryButtonsPanel = JPanel().apply {
             add(pasteButton)
             add(chooseFileButton)
+            add(clearButton)
             transferHandler = queryDropHandler
         }
 
@@ -226,13 +242,27 @@ private class IconTileRenderer : ListCellRenderer<RenderedIcon> {
             is RenderedIcon.Rendered -> ImageIcon(value.image)
             is RenderedIcon.Failed -> AllIcons.General.Warning
         }
-        panel.add(JLabel(icon).apply { alignmentX = Component.CENTER_ALIGNMENT })
-        panel.add(JLabel(value.resource.name).apply { alignmentX = Component.CENTER_ALIGNMENT })
-        panel.add(
-            JLabel("${value.resource.type} · ${value.resource.moduleName}").apply {
-                alignmentX = Component.CENTER_ALIGNMENT
-            },
-        )
+        val iconLabel = JLabel(icon).apply {
+            alignmentX = Component.CENTER_ALIGNMENT
+            horizontalAlignment = JLabel.CENTER
+            verticalAlignment = JLabel.CENTER
+            val tileSize = Dimension(RENDER_SIZE, RENDER_SIZE)
+            preferredSize = tileSize
+            minimumSize = tileSize
+            maximumSize = tileSize
+        }
+        val nameLabel = JLabel(value.resource.name).apply {
+            alignmentX = Component.CENTER_ALIGNMENT
+            font = font.deriveFont(Font.BOLD)
+        }
+        val typeLabel = JLabel("${value.resource.type} · ${value.resource.moduleName}").apply {
+            alignmentX = Component.CENTER_ALIGNMENT
+            font = font.deriveFont(Font.PLAIN, font.size2D - 1f)
+            foreground = UIManager.getColor("Label.disabledForeground") ?: foreground
+        }
+        panel.add(iconLabel)
+        panel.add(nameLabel)
+        panel.add(typeLabel)
         return panel
     }
 }

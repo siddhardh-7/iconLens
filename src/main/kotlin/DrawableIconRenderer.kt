@@ -9,7 +9,7 @@ import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 
 private val LOG = logger<DrawableIconRenderer>()
-private const val RENDER_SIZE = 48
+internal const val RENDER_SIZE = 48
 
 class UnsupportedRasterException(message: String) : Exception(message)
 
