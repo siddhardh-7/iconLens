@@ -225,3 +225,54 @@ The "uniform scale-to-fit, centered" arithmetic used by `CenteredImageNormalizer
 panel — they are an internal artifact for the future `SimilarityEngine` (M6+), not
 a display concern. See
 `docs/superpowers/specs/2026-07-31-normalization-design.md` for full rationale.
+
+---
+
+# IconDescriptor / SimilarityEngine
+
+`IconDescriptor` is what `SimilarityEngine` produces from a `NormalizedIcon` — a
+compact, comparable signature:
+
+```kotlin
+data class IconDescriptor(val hash: Long)
+```
+
+```kotlin
+interface SimilarityEngine {
+    fun describe(icon: NormalizedIcon): IconDescriptor
+    fun score(a: IconDescriptor, b: IconDescriptor): Double
+}
+```
+
+`describe` and `score` live on one interface rather than being split apart: a
+descriptor's bits are only meaningful to the matching comparison function (a
+perceptual-hash descriptor and a difference-hash descriptor aren't
+cross-comparable), so if the algorithm evolves later per `PRD.md`'s "must allow
+the similarity algorithm to evolve later" requirement, it evolves as one unit,
+not two pieces that could drift out of sync.
+
+`DHashSimilarityEngine` is the only concrete implementation: a difference hash
+(dHash). `describe` resizes the 64x64 `NormalizedIcon.image` to 9x8 (bilinear,
+same technique `CenteredImageNormalizer` uses), converts to grayscale, and packs
+64 row-wise adjacent-pixel comparisons into a `Long`. `score` compares two
+hashes via Hamming distance (`java.lang.Long.bitCount(a.hash xor b.hash)`) into
+a `1.0` (identical) to `0.0` (every bit differs) range — the same shape as the
+percentage `PRD.md`/M7 will eventually display.
+
+```kotlin
+data class ScoredMatch<T>(val candidate: T, val score: Double)
+
+fun <T> rankBySimilarity(
+    engine: SimilarityEngine,
+    query: IconDescriptor,
+    candidates: List<Pair<T, IconDescriptor>>,
+): List<ScoredMatch<T>>
+```
+
+`rankBySimilarity` is generic over the caller's own candidate type, so neither
+it nor `SimilarityEngine` needs to know about `IconResource`/`RenderedIcon`
+directly, per the "similarity must not know where an icon originated" rule.
+
+None of this is wired into the gallery UI or the query panel yet — that's
+`ROADMAP.md` M7 ("Search Experience"). See
+`docs/superpowers/specs/2026-07-31-similarity-design.md` for full rationale.

@@ -146,17 +146,26 @@ green.
 
 ## M6 — Similarity
 
-Status: NOT STARTED
+Status: DONE
 
-- [ ] Introduce IconDescriptor
-- [ ] Introduce SimilarityEngine
-- [ ] Implement lightweight local similarity
-- [ ] Build descriptors for indexed resources
-- [ ] Compare query against candidates
-- [ ] Rank results
-- [ ] Add regression fixtures/tests
+- [x] Introduce IconDescriptor
+- [x] Introduce SimilarityEngine
+- [x] Implement lightweight local similarity
+- [x] Build descriptors for indexed resources
+- [x] Compare query against candidates
+- [x] Rank results
+- [x] Add regression fixtures/tests
 
-No ML/cloud services.
+No ML/cloud services. `SimilarityEngine` computes a difference hash (dHash) from
+a `NormalizedIcon`'s 64x64 canvas (bilinear downsample to 9x8, grayscale, row-wise
+adjacent-pixel comparison, 64-bit signature) and compares two descriptors via
+Hamming distance into a 0.0-1.0 score. `rankBySimilarity` sorts arbitrary
+candidates by score against a query descriptor. Not wired into the gallery/query
+UI this milestone — see `docs/superpowers/specs/2026-07-31-similarity-design.md`.
+
+Verified: 6 DHashSimilarityEngineTest + 2 SimilarityRankingTest new tests (86 tests
+total across the suite), all passing (`./gradlew test`); full `./gradlew build`
+green.
 
 ---
 
