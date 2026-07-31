@@ -40,9 +40,6 @@ For individual developers, that means less time hunting through `res/drawable`.
 For teams, it means fewer duplicate assets, a smaller resource collection, and
 more consistent icon use over time.
 
-> Add a short GIF or screenshot here before release: paste a design icon, view
-> ranked matches, and reuse `ic_map_marker`.
-
 ## Privacy and diagnostics
 
 Icon search runs locally in Android Studio. Your project icons and source code
@@ -86,4 +83,4 @@ next.
 
 ## License
 
-License information will be added before the public release.
+IconLens is licensed under the [Apache License 2.0](LICENSE).
