@@ -13,17 +13,20 @@ fun renderVectorDrawable(xml: String, size: Int): BufferedImage {
         if (shape.viewportWidth > 0 && shape.viewportHeight > 0) {
             g.scale(size / shape.viewportWidth, size / shape.viewportHeight)
         }
+        val defaultClip = g.clip
         for (styledPath in shape.paths) {
-            if (styledPath.fillColor != null) {
-                g.color = styledPath.fillColor
+            g.clip = styledPath.clip ?: defaultClip
+            if (styledPath.fillPaint != null) {
+                g.paint = styledPath.fillPaint
                 g.fill(styledPath.path)
             }
             if (styledPath.strokeColor != null && styledPath.strokeWidth > 0f) {
-                g.color = styledPath.strokeColor
+                g.paint = styledPath.strokeColor
                 g.stroke = BasicStroke(styledPath.strokeWidth)
                 g.draw(styledPath.path)
             }
         }
+        g.clip = defaultClip
     } finally {
         g.dispose()
     }
