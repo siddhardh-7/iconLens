@@ -8,13 +8,19 @@
     <name>IconLens</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <vendor url="https://github.com/siddhardh-7">Siddhardha</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
+        <h2>Find existing icons before adding duplicates</h2>
+        <p>IconLens helps Android developers visually search their project's drawable resources, so they can reuse an existing icon instead of creating another copy.</p>
+        <p>Paste, drag in, or choose an icon from a design; then review visually ranked project matches and reuse the right resource.</p>
+        <ul>
+          <li>Browse project drawables in a visual gallery</li>
+          <li>Search from the clipboard, drag and drop, or an image file</li>
+          <li>Keep visual search local to Android Studio</li>
+        </ul>
         ]]></description>
 
     <!-- Product and plugin compatibility requirements.
