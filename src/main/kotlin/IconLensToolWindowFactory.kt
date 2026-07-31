@@ -23,7 +23,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.awt.BorderLayout
 import java.awt.Component
-import java.awt.datatransfer.DataFlavor
+import java.awt.Image
+import java.awt.image.BufferedImage
 import javax.swing.BorderFactory
 import javax.swing.BoxLayout
 import javax.swing.DefaultListModel
@@ -37,11 +38,19 @@ import javax.swing.TransferHandler
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
+private const val MAX_QUERY_PREVIEW_DIMENSION = 128
+
+private fun BufferedImage.scaledForPreview(): Image {
+    if (width <= MAX_QUERY_PREVIEW_DIMENSION && height <= MAX_QUERY_PREVIEW_DIMENSION) return this
+    val scale = MAX_QUERY_PREVIEW_DIMENSION.toDouble() / maxOf(width, height)
+    return getScaledInstance((width * scale).toInt(), (height * scale).toInt(), Image.SCALE_SMOOTH)
+}
+
 class IconLensToolWindowFactory : ToolWindowFactory {
     override fun shouldBeAvailable(project: Project) = true
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         val listModel = DefaultListModel<RenderedIcon>()
         val list = JBList(listModel).apply {
@@ -92,7 +101,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         fun showQueryImage(result: QueryImage) {
             when (result) {
                 is QueryImage.Loaded -> {
-                    queryPreviewLabel.icon = ImageIcon(result.image)
+                    queryPreviewLabel.icon = ImageIcon(result.image.scaledForPreview())
                     queryPreviewLabel.text = null
                     querySourceLabel.text = result.sourceDescription
                 }
@@ -104,10 +113,16 @@ class IconLensToolWindowFactory : ToolWindowFactory {
             }
         }
 
+        var latestRequestId = 0
+        var contentDisposed = false
+
         fun loadAndShow(load: () -> QueryImage?) {
+            val requestId = ++latestRequestId
             scope.launch {
-                val result = load() ?: return@launch
-                ApplicationManager.getApplication().invokeLater { showQueryImage(result) }
+                val result = load() ?: QueryImage.Failed("No image found")
+                ApplicationManager.getApplication().invokeLater {
+                    if (!contentDisposed && requestId == latestRequestId) showQueryImage(result)
+                }
             }
         }
 
@@ -118,37 +133,51 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         val chooseFileButton = JButton(IconLensBundle.message("toolwindow.IconLens.chooseFile")).apply {
             addActionListener {
                 val descriptor = FileChooserDescriptor(true, false, false, false, false, false)
-                    .withFileFilter { it.extension?.lowercase() in setOf("png", "jpg", "jpeg", "webp") }
+                    .withFileFilter {
+                        resolveIconResourceType(it.name) in
+                            setOf(
+                                IconResourceType.PNG,
+                                IconResourceType.WEBP,
+                                IconResourceType.JPEG,
+                                IconResourceType.VECTOR_DRAWABLE,
+                            ) ||
+                            it.extension.equals("svg", ignoreCase = true)
+                    }
                 val chosen = FileChooser.chooseFile(descriptor, project, null) ?: return@addActionListener
                 val file = VfsUtilCore.virtualToIoFile(chosen)
                 loadAndShow { loadQueryImageFromFile(file) }
             }
         }
 
+        val queryDropHandler = object : TransferHandler() {
+            override fun canImport(support: TransferSupport) =
+                SUPPORTED_TRANSFERABLE_FLAVORS.any { support.isDataFlavorSupported(it) }
+
+            override fun importData(support: TransferSupport): Boolean {
+                if (!canImport(support)) return false
+                loadAndShow { loadQueryImageFromTransferable(support.transferable, "Dropped image") }
+                return true
+            }
+        }
+
+        querySourceLabel.transferHandler = queryDropHandler
+
         val queryPreviewArea = JPanel(BorderLayout()).apply {
             add(queryPreviewLabel, BorderLayout.CENTER)
-            transferHandler = object : TransferHandler() {
-                override fun canImport(support: TransferSupport) =
-                    support.isDataFlavorSupported(DataFlavor.imageFlavor) ||
-                        support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
-
-                override fun importData(support: TransferSupport): Boolean {
-                    if (!canImport(support)) return false
-                    loadAndShow { loadQueryImageFromTransferable(support.transferable, "Dropped image") }
-                    return true
-                }
-            }
+            transferHandler = queryDropHandler
         }
 
         val queryButtonsPanel = JPanel().apply {
             add(pasteButton)
             add(chooseFileButton)
+            transferHandler = queryDropHandler
         }
 
         val queryPanel = JPanel(BorderLayout()).apply {
             add(queryPreviewArea, BorderLayout.CENTER)
             add(querySourceLabel, BorderLayout.SOUTH)
             add(queryButtonsPanel, BorderLayout.EAST)
+            transferHandler = queryDropHandler
         }
 
         val filterPanel = JPanel(BorderLayout()).apply {
@@ -169,7 +198,13 @@ class IconLensToolWindowFactory : ToolWindowFactory {
 
         val content = ContentFactory.getInstance().createContent(panel, null, false)
         toolWindow.contentManager.addContent(content)
-        Disposer.register(content, Disposable { scope.cancel() })
+        Disposer.register(
+            content,
+            Disposable {
+                contentDisposed = true
+                scope.cancel()
+            },
+        )
 
         refresh()
     }

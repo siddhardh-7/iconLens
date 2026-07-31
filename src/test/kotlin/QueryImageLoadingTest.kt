@@ -32,6 +32,82 @@ class QueryImageLoadingTest {
         assertTrue(result is QueryImage.Failed)
     }
 
+    @Test
+    fun `loadQueryImageFromFile decodes a VectorDrawable XML file`() {
+        val file = File.createTempFile("query", ".xml")
+        file.deleteOnExit()
+        file.writeText(
+            """
+            <vector xmlns:android="http://schemas.android.com/apk/res/android"
+                android:viewportWidth="24" android:viewportHeight="24">
+                <path android:fillColor="#FF0000" android:pathData="M0,0 L24,0 L24,24 L0,24 Z"/>
+            </vector>
+            """.trimIndent(),
+        )
+
+        val result = loadQueryImageFromFile(file)
+
+        assertTrue(result is QueryImage.Loaded)
+        assertEquals(file.name, (result as QueryImage.Loaded).sourceDescription)
+    }
+
+    @Test
+    fun `loadQueryImageFromFile fails gracefully on malformed VectorDrawable XML`() {
+        val file = File.createTempFile("query", ".xml")
+        file.deleteOnExit()
+        file.writeText("<not-a-vector/>")
+
+        val result = loadQueryImageFromFile(file)
+
+        assertTrue(result is QueryImage.Failed)
+    }
+
+    @Test
+    fun `loadQueryImageFromFile decodes an SVG file`() {
+        val file = File.createTempFile("query", ".svg")
+        file.deleteOnExit()
+        file.writeText(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" fill="#00A0FF"/>
+            </svg>
+            """.trimIndent(),
+        )
+
+        val result = loadQueryImageFromFile(file)
+
+        assertTrue(result is QueryImage.Loaded)
+        assertEquals(file.name, (result as QueryImage.Loaded).sourceDescription)
+    }
+
+    @Test
+    fun `loadQueryImageFromFile upscales an SVG with no explicit width or height`() {
+        val file = File.createTempFile("query", ".svg")
+        file.deleteOnExit()
+        file.writeText(
+            """<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 12L4 12M20 12L14 18M20 12L14 6" stroke="#000000" stroke-width="1.5"/>
+            </svg>
+            """.trimIndent(),
+        )
+
+        val result = loadQueryImageFromFile(file)
+
+        assertTrue(result is QueryImage.Loaded)
+        val image = (result as QueryImage.Loaded).image
+        assertTrue(image.width >= 128 && image.height >= 128)
+    }
+
+    @Test
+    fun `loadQueryImageFromFile fails gracefully on malformed SVG`() {
+        val file = File.createTempFile("query", ".svg")
+        file.deleteOnExit()
+        file.writeText("not real svg content")
+
+        val result = loadQueryImageFromFile(file)
+
+        assertTrue(result is QueryImage.Failed)
+    }
+
     private class FakeTransferable(
         private val flavors: List<java.awt.datatransfer.DataFlavor>,
         private val data: Map<java.awt.datatransfer.DataFlavor, Any>,
@@ -93,6 +169,51 @@ class QueryImageLoadingTest {
         val transferable = FakeTransferable(emptyList(), emptyMap())
 
         val result = loadQueryImageFromTransferable(transferable, "Dropped image")
+
+        assertEquals(null, result)
+    }
+
+    @Test
+    fun `loadQueryImageFromTransferable decodes SVG markup pasted as plain text`() {
+        val svgText = """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" fill="#00A0FF"/>
+        </svg>
+        """.trimIndent()
+        val transferable = FakeTransferable(
+            listOf(java.awt.datatransfer.DataFlavor.stringFlavor),
+            mapOf(java.awt.datatransfer.DataFlavor.stringFlavor to svgText),
+        )
+
+        val result = loadQueryImageFromTransferable(transferable, "Pasted from clipboard")
+
+        assertTrue(result is QueryImage.Loaded)
+    }
+
+    @Test
+    fun `loadQueryImageFromTransferable decodes VectorDrawable XML markup pasted as plain text`() {
+        val xmlText = """<vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FF0000" android:pathData="M0,0 L24,0 L24,24 L0,24 Z"/>
+        </vector>
+        """.trimIndent()
+        val transferable = FakeTransferable(
+            listOf(java.awt.datatransfer.DataFlavor.stringFlavor),
+            mapOf(java.awt.datatransfer.DataFlavor.stringFlavor to xmlText),
+        )
+
+        val result = loadQueryImageFromTransferable(transferable, "Pasted from clipboard")
+
+        assertTrue(result is QueryImage.Loaded)
+    }
+
+    @Test
+    fun `loadQueryImageFromTransferable returns null for plain text that is not image markup`() {
+        val transferable = FakeTransferable(
+            listOf(java.awt.datatransfer.DataFlavor.stringFlavor),
+            mapOf(java.awt.datatransfer.DataFlavor.stringFlavor to "just some copied text"),
+        )
+
+        val result = loadQueryImageFromTransferable(transferable, "Pasted from clipboard")
 
         assertEquals(null, result)
     }

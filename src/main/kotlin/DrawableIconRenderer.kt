@@ -3,7 +3,6 @@ package io.github.siddhardh7.iconlens
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.logger
 import kotlinx.coroutines.CancellationException
-import java.awt.BasicStroke
 import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
@@ -40,22 +39,8 @@ class DrawableIconRenderer : IconRenderer {
         }
     }
 
-    private fun decodeVector(bytes: ByteArray): BufferedImage {
-        val shape = parseVectorDrawable(bytes.toString(Charsets.UTF_8))
-        return scaleToSquare(shape.viewportWidth.toInt(), shape.viewportHeight.toInt()) { g ->
-            for (styledPath in shape.paths) {
-                if (styledPath.fillColor != null) {
-                    g.color = styledPath.fillColor
-                    g.fill(styledPath.path)
-                }
-                if (styledPath.strokeColor != null && styledPath.strokeWidth > 0f) {
-                    g.color = styledPath.strokeColor
-                    g.stroke = BasicStroke(styledPath.strokeWidth)
-                    g.draw(styledPath.path)
-                }
-            }
-        }
-    }
+    private fun decodeVector(bytes: ByteArray): BufferedImage =
+        renderVectorDrawable(bytes.toString(Charsets.UTF_8), RENDER_SIZE)
 
     private fun scaleToSquare(sourceWidth: Int, sourceHeight: Int, draw: (Graphics2D) -> Unit): BufferedImage {
         val image = BufferedImage(RENDER_SIZE, RENDER_SIZE, BufferedImage.TYPE_INT_ARGB)
