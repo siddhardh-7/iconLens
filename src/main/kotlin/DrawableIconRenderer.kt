@@ -48,7 +48,9 @@ class DrawableIconRenderer : IconRenderer {
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             if (sourceWidth > 0 && sourceHeight > 0) {
-                g.scale(RENDER_SIZE.toDouble() / sourceWidth, RENDER_SIZE.toDouble() / sourceHeight)
+                val scale = RENDER_SIZE / maxOf(sourceWidth, sourceHeight).toDouble()
+                g.translate((RENDER_SIZE - sourceWidth * scale) / 2, (RENDER_SIZE - sourceHeight * scale) / 2)
+                g.scale(scale, scale)
             }
             draw(g)
         } finally {

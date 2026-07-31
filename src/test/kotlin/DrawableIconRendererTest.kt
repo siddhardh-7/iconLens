@@ -47,6 +47,28 @@ class DrawableIconRendererTest : BasePlatformTestCase() {
         assertTrue(result is RenderedIcon.Rendered)
     }
 
+    fun testRendersNonSquareRasterCenteredInsteadOfStretched() {
+        val image = BufferedImage(4, 8, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        g.color = java.awt.Color.BLACK
+        g.fillRect(0, 0, 4, 8)
+        g.dispose()
+        val bytes = ByteArrayOutputStream().also { ImageIO.write(image, "png", it) }.toByteArray()
+        val file = myFixture.tempDirFixture.createFile("ic_tall.png", "")
+        ApplicationManager.getApplication().runWriteAction { file.setBinaryContent(bytes) }
+        val resource = IconResource("ic_tall", IconResourceType.PNG, file, "app")
+
+        val result = runBlocking { DrawableIconRenderer().render(resource) } as RenderedIcon.Rendered
+
+        // RENDER_SIZE is 48; a 4x8 source scaled to fit (limited by height) becomes 24 wide, 48
+        // tall, centered horizontally with a 12px transparent margin on each side. Stretching to
+        // fill the square would leave no margin at all.
+        val alphaAtMargin = (result.image.getRGB(3, 24) ushr 24) and 0xFF
+        val alphaAtCenter = (result.image.getRGB(24, 24) ushr 24) and 0xFF
+        assertEquals(0, alphaAtMargin)
+        assertEquals(255, alphaAtCenter)
+    }
+
     fun testFailsGracefullyOnMalformedVectorDrawable() {
         myFixture.tempDirFixture.createFile("ic_broken.xml", "<vector><path")
         val file = myFixture.tempDirFixture.getFile("ic_broken.xml")!!
