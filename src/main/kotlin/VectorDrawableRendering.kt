@@ -10,11 +10,9 @@ fun renderVectorDrawable(xml: String, size: Int): BufferedImage {
     val g = image.createGraphics()
     try {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-        if (shape.viewportWidth > 0 && shape.viewportHeight > 0) {
-            val scale = size / maxOf(shape.viewportWidth, shape.viewportHeight)
-            g.translate((size - shape.viewportWidth * scale) / 2, (size - shape.viewportHeight * scale) / 2)
-            g.scale(scale, scale)
-        }
+        val fit = fitScaleAndOffset(shape.viewportWidth, shape.viewportHeight, size)
+        g.translate(fit.offsetX, fit.offsetY)
+        g.scale(fit.scale, fit.scale)
         val defaultClip = g.clip
         for (styledPath in shape.paths) {
             g.clip = styledPath.clip ?: defaultClip
