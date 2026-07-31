@@ -40,4 +40,13 @@ class IconFitScalingTest {
         assertEquals(0.0, fit.offsetX, 0.0001)
         assertEquals(0.0, fit.offsetY, 0.0001)
     }
+
+    @Test
+    fun `non-positive dimensions return an identity transform instead of dividing by zero (zero height)`() {
+        val fit = fitScaleAndOffset(10.0, 0.0, 40)
+
+        assertEquals(1.0, fit.scale, 0.0001)
+        assertEquals(0.0, fit.offsetX, 0.0001)
+        assertEquals(0.0, fit.offsetY, 0.0001)
+    }
 }

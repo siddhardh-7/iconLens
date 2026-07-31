@@ -19,6 +19,7 @@ class CenteredImageNormalizer : ImageNormalizer {
             g.color = Color.WHITE
             g.fillRect(0, 0, NORMALIZED_SIZE, NORMALIZED_SIZE)
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
             val fit = fitScaleAndOffset(cropped.width.toDouble(), cropped.height.toDouble(), NORMALIZED_SIZE)
             g.translate(fit.offsetX, fit.offsetY)
             g.scale(fit.scale, fit.scale)
@@ -46,6 +47,9 @@ class CenteredImageNormalizer : ImageNormalizer {
             }
         }
         return if (maxX < minX || maxY < minY) {
+            // No non-transparent pixels found; fall back to the full image bounds so the
+            // caller composites an all-transparent crop onto white (a plain white result)
+            // rather than crashing on a zero-size crop.
             Rectangle(0, 0, image.width, image.height)
         } else {
             Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1)
