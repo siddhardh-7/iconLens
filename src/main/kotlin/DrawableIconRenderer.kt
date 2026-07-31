@@ -47,11 +47,9 @@ class DrawableIconRenderer : IconRenderer {
         val g = image.createGraphics()
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            if (sourceWidth > 0 && sourceHeight > 0) {
-                val scale = RENDER_SIZE / maxOf(sourceWidth, sourceHeight).toDouble()
-                g.translate((RENDER_SIZE - sourceWidth * scale) / 2, (RENDER_SIZE - sourceHeight * scale) / 2)
-                g.scale(scale, scale)
-            }
+            val fit = fitScaleAndOffset(sourceWidth.toDouble(), sourceHeight.toDouble(), RENDER_SIZE)
+            g.translate(fit.offsetX, fit.offsetY)
+            g.scale(fit.scale, fit.scale)
             draw(g)
         } finally {
             g.dispose()
