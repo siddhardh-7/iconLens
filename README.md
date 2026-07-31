@@ -81,6 +81,14 @@ IconLens is preparing for its first public release. Feedback from Android
 developers and teams using large drawable collections will guide what comes
 next.
 
+## Help shape IconLens
+
+If IconLens saves you from adding a duplicate asset, please star the project.
+Share workflow questions and ideas in
+[GitHub Discussions](https://github.com/siddhardh-7/iconLens/discussions), or
+open an issue with a reproducible icon-search case that would make the plugin
+more useful.
+
 ## License
 
 IconLens is licensed under the [Apache License 2.0](LICENSE).
