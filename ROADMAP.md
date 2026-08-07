@@ -200,12 +200,21 @@ implementation summary.
 
 ## M8 — Resource Actions
 
-Status: NOT STARTED
+Status: DONE
 
-- [ ] Open resource
-- [ ] Reveal resource in project
-- [ ] Copy resource name
-- [ ] Copy `R.drawable.resource_name` where appropriate
+- [x] Open resource
+- [x] Reveal resource in project
+- [x] Copy resource name
+- [x] Copy `R.drawable.resource_name` where appropriate
+
+Verified: `./gradlew build` and `./gradlew test` green after adding
+`GalleryResourceActions.kt`'s right-click menu and double-click-to-open.
+Manually verified via `runIde`: all four actions work on both rendered and
+failed tiles, right-click always acts on the clicked tile, actions are
+disabled with no selection. See
+`docs/superpowers/specs/2026-08-07-resource-actions-design.md` for the
+design and `ARCHITECTURE.md`'s "Resource Actions (M8)" section for the
+implementation summary.
 
 ---
 

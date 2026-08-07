@@ -334,3 +334,33 @@ active. There is no persistent index or descriptor cache; that's `ROADMAP.md`
 M9 ("Incremental Indexing"), not this milestone. See
 `docs/superpowers/specs/2026-08-01-search-experience-design.md` for full
 rationale.
+
+---
+
+# Resource Actions (M8)
+
+`GalleryResourceActions.kt` adds a right-click context menu and a
+double-click-to-open shortcut on the gallery's `JBList<GalleryTile>`,
+installed via `installGalleryResourceActions(project, list)`:
+
+```kotlin
+fun installGalleryResourceActions(project: Project, list: JBList<GalleryTile>)
+```
+
+Four `AnAction`s read the selected `GalleryTile.icon.resource`
+(`IconResource`) and act on it — Open (`FileEditorManager.openFile`), Reveal
+in Project View (`ProjectView.select`), Copy Name (`resource.name`), and
+Copy Reference (`androidResourceReference`, a pure `"R.drawable.<name>"`
+formatter, unit-tested independently of the `AnAction`/Swing plumbing). All
+four work identically on `RenderedIcon.Rendered` and `RenderedIcon.Failed`
+tiles, since both carry a real `IconResource`/`VirtualFile` — a rendering
+failure never blocks acting on the underlying resource.
+
+The popup uses the platform's `PopupHandler.installSelectionListPopup`,
+which moves the list's selection to the row under the cursor before
+showing the menu, so the menu always acts on what was actually clicked.
+Open and Reveal check `resource.file.isValid` first and no-op on a stale
+file (deleted/moved since the last gallery load) rather than throwing;
+Copy Name/Reference only read the already-extracted `resource.name`
+string, so they don't need that guard. No multi-select batching and no
+clipboard-copy confirmation UI in V0.1.
