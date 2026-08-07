@@ -61,6 +61,9 @@ class IconLensToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val normalizer = CenteredImageNormalizer()
+        val engine = DHashSimilarityEngine()
+        var activeQueryImage: BufferedImage? = null
 
         val listModel = DefaultListModel<GalleryTile>()
         val list = JBList(listModel).apply {
@@ -73,6 +76,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         var allIcons: List<RenderedIcon> = emptyList()
 
         fun applyFilter(query: String) {
+            if (activeQueryImage != null) return
             listModel.clear()
             filterByName(allIcons, query).forEach { listModel.addElement(GalleryTile(it, null)) }
         }
@@ -85,11 +89,20 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         })
 
         fun refresh() {
+            val queryAtRefreshTime = activeQueryImage
             scope.launch {
                 val rendered = loadGallery(DrawableIconSource(project), DrawableIconRenderer())
+                val ranked = queryAtRefreshTime?.let {
+                    rankRenderedIcons(rendered.filterIsInstance<RenderedIcon.Rendered>(), it, normalizer, engine)
+                }
                 ApplicationManager.getApplication().invokeLater {
                     allIcons = rendered
-                    applyFilter(filterField.text)
+                    if (ranked != null) {
+                        listModel.clear()
+                        ranked.forEach { listModel.addElement(GalleryTile(it.candidate, it.score)) }
+                    } else {
+                        applyFilter(filterField.text)
+                    }
                 }
             }
         }
@@ -128,16 +141,33 @@ class IconLensToolWindowFactory : ToolWindowFactory {
 
         fun loadAndShow(load: () -> QueryImage?) {
             val requestId = ++latestRequestId
+            val galleryAtRequestTime = allIcons.filterIsInstance<RenderedIcon.Rendered>()
             scope.launch {
                 val result = load() ?: QueryImage.Failed("No image found")
+                val ranked = if (result is QueryImage.Loaded) {
+                    rankRenderedIcons(galleryAtRequestTime, result.image, normalizer, engine)
+                } else {
+                    null
+                }
                 ApplicationManager.getApplication().invokeLater {
-                    if (!contentDisposed && requestId == latestRequestId) showQueryImage(result)
+                    if (!contentDisposed && requestId == latestRequestId) {
+                        showQueryImage(result)
+                        if (result is QueryImage.Loaded && ranked != null) {
+                            activeQueryImage = result.image
+                            filterField.isEnabled = false
+                            filterField.text = ""
+                            listModel.clear()
+                            ranked.forEach { listModel.addElement(GalleryTile(it.candidate, it.score)) }
+                        }
+                    }
                 }
             }
         }
 
         fun clearQuery() {
             latestRequestId++
+            activeQueryImage = null
+            filterField.isEnabled = true
             queryPreviewLabel.icon = null
             queryPreviewLabel.text = IconLensBundle.message("toolwindow.IconLens.queryEmpty")
             querySourceLabel.text = " "
