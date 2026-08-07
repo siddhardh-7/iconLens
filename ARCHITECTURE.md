@@ -92,6 +92,13 @@ duplicates (e.g. `drawable-hdpi/ic_calendar.png` and `drawable-xhdpi/ic_calendar
 down to one `IconResource` per resource name per module — preferring the
 density-less `drawable/` variant when present.
 
+Android Gradle sync represents one Gradle module as several IntelliJ modules (root
+project, the app module, its main source set, and so on), and their content roots can
+nest/overlap. Before the per-module density dedup above, `pickRepresentatives` first
+collapses candidates that resolve to the exact same physical file (by `VirtualFile.path`)
+regardless of which module's scan found it, keeping the most specific (longest) module
+name — otherwise the same drawable appears once per module in that nesting chain.
+
 It does not depend on the `org.jetbrains.android` plugin/facet APIs — a plain VFS
 directory-name scan is sufficient for V0.1's bar and avoids an unjustified dependency;
 this can be revisited if it proves too imprecise on real multi-flavor projects.

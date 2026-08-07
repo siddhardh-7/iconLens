@@ -51,14 +51,61 @@ class DrawableRepresentativePickerTest {
     }
 
     @Test
-    fun `different modules with the same resource name stay separate`() {
-        val appIcon = candidate(module = "app", qualifier = "drawable")
-        val libIcon = candidate(module = "core", qualifier = "drawable")
+    fun `different modules with genuinely different files stay separate`() {
+        val appIcon = DrawableCandidate(
+            moduleName = "app",
+            qualifierDirName = "drawable",
+            baseName = "ic_calendar",
+            type = IconResourceType.PNG,
+            file = LightVirtualFile("app/ic_calendar-drawable"),
+        )
+        val libIcon = DrawableCandidate(
+            moduleName = "core",
+            qualifierDirName = "drawable",
+            baseName = "ic_calendar",
+            type = IconResourceType.PNG,
+            file = LightVirtualFile("core/ic_calendar-drawable"),
+        )
 
         val result = pickRepresentatives(listOf(appIcon, libIcon))
 
         assertEquals(2, result.size)
         assertEquals(setOf("app", "core"), result.map { it.moduleName }.toSet())
+    }
+
+    @Test
+    fun `same physical file discovered under nested module content roots collapses to one result`() {
+        // Android Gradle sync represents one Gradle module as several IntelliJ modules
+        // (root project, the app module, its main source set, etc). When those modules'
+        // content roots nest/overlap, the same drawable file is discovered once per module
+        // in the chain -- it must still collapse to a single IconResource.
+        val sharedFile = LightVirtualFile("app/src/main/res/drawable/home_location.xml")
+        val viaRoot = DrawableCandidate(
+            moduleName = "KYN",
+            qualifierDirName = "drawable",
+            baseName = "home_location",
+            type = IconResourceType.VECTOR_DRAWABLE,
+            file = sharedFile,
+        )
+        val viaAppModule = DrawableCandidate(
+            moduleName = "KYN.app",
+            qualifierDirName = "drawable",
+            baseName = "home_location",
+            type = IconResourceType.VECTOR_DRAWABLE,
+            file = sharedFile,
+        )
+        val viaMainSourceSet = DrawableCandidate(
+            moduleName = "KYN.app.main",
+            qualifierDirName = "drawable",
+            baseName = "home_location",
+            type = IconResourceType.VECTOR_DRAWABLE,
+            file = sharedFile,
+        )
+
+        val result = pickRepresentatives(listOf(viaRoot, viaAppModule, viaMainSourceSet))
+
+        assertEquals(1, result.size)
+        assertEquals("KYN.app.main", result.single().moduleName)
     }
 
     @Test

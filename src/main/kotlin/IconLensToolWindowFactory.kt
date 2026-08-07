@@ -47,6 +47,22 @@ import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
 private const val MAX_QUERY_PREVIEW_DIMENSION = 128
+private const val CHECKER_CELL_SIZE = 8
+private val CHECKER_LIGHT = Color(222, 222, 222)
+private val CHECKER_DARK = Color(196, 196, 196)
+
+private fun paintCheckerboard(g: Graphics2D, width: Int, height: Int) {
+    var y = 0
+    while (y < height) {
+        var x = 0
+        while (x < width) {
+            g.color = if (((x / CHECKER_CELL_SIZE) + (y / CHECKER_CELL_SIZE)) % 2 == 0) CHECKER_LIGHT else CHECKER_DARK
+            g.fillRect(x, y, CHECKER_CELL_SIZE, CHECKER_CELL_SIZE)
+            x += CHECKER_CELL_SIZE
+        }
+        y += CHECKER_CELL_SIZE
+    }
+}
 
 private data class GalleryTile(val icon: RenderedIcon, val score: Double?)
 
@@ -285,6 +301,7 @@ private class IconTileRenderer : ListCellRenderer<GalleryTile> {
         val score = value.score
         val iconLabel = object : JLabel(icon) {
             override fun paintComponent(g: Graphics) {
+                paintCheckerboard(g as Graphics2D, width, height)
                 super.paintComponent(g)
                 if (score == null) return
                 val text = "${(score * 100).roundToInt()}%"
