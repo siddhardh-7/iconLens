@@ -64,6 +64,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         val normalizer = CenteredImageNormalizer()
         val engine = DHashSimilarityEngine()
         var activeQueryImage: BufferedImage? = null
+        var contentDisposed = false
 
         val listModel = DefaultListModel<GalleryTile>()
         val list = JBList(listModel).apply {
@@ -96,12 +97,14 @@ class IconLensToolWindowFactory : ToolWindowFactory {
                     rankRenderedIcons(rendered.filterIsInstance<RenderedIcon.Rendered>(), it, normalizer, engine)
                 }
                 ApplicationManager.getApplication().invokeLater {
-                    allIcons = rendered
-                    if (ranked != null) {
-                        listModel.clear()
-                        ranked.forEach { listModel.addElement(GalleryTile(it.candidate, it.score)) }
-                    } else {
-                        applyFilter(filterField.text)
+                    if (!contentDisposed) {
+                        allIcons = rendered
+                        if (ranked != null && activeQueryImage != null) {
+                            listModel.clear()
+                            ranked.forEach { listModel.addElement(GalleryTile(it.candidate, it.score)) }
+                        } else {
+                            applyFilter(filterField.text)
+                        }
                     }
                 }
             }
@@ -137,7 +140,6 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         }
 
         var latestRequestId = 0
-        var contentDisposed = false
 
         fun loadAndShow(load: () -> QueryImage?) {
             val requestId = ++latestRequestId
