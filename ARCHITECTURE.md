@@ -181,9 +181,9 @@ VectorDrawable XML rendering is shared, not duplicated: `VectorDrawableRendering
 larger size for a crisper result) — one parser, one renderer, two callers.
 
 `IconLensToolWindowFactory`'s query panel (Paste / Choose file... / Clear, plus
-drag-and-drop) is the only consumer today, and it is not wired to anything else —
-choosing or pasting a query image has no effect on the gallery below it. Comparing
-the query against indexed resources is `SimilarityEngine` work, starting at M6.
+drag-and-drop) feeds the `SimilarityEngine`-based ranking described in
+"Search Experience (M7)" below — loading a query image re-ranks the gallery
+instead of only updating the preview.
 
 ---
 
@@ -273,6 +273,49 @@ fun <T> rankBySimilarity(
 it nor `SimilarityEngine` needs to know about `IconResource`/`RenderedIcon`
 directly, per the "similarity must not know where an icon originated" rule.
 
-None of this is wired into the gallery UI or the query panel yet — that's
-`ROADMAP.md` M7 ("Search Experience"). See
-`docs/superpowers/specs/2026-07-31-similarity-design.md` for full rationale.
+"Search Experience (M7)" below wires this into the gallery UI and query panel.
+See `docs/superpowers/specs/2026-07-31-similarity-design.md` for full rationale
+on the similarity design itself.
+
+---
+
+# Search Experience (M7)
+
+`rankRenderedIcons` (`IconGalleryModel.kt`) is the pure, Swing-free bridge between
+a query `BufferedImage` and the gallery's `RenderedIcon.Rendered` list:
+
+```kotlin
+fun rankRenderedIcons(
+    icons: List<RenderedIcon.Rendered>,
+    query: BufferedImage,
+    normalizer: ImageNormalizer,
+    engine: SimilarityEngine,
+): List<ScoredMatch<RenderedIcon.Rendered>>
+```
+
+It normalizes and describes the query and every candidate, then delegates to
+`rankBySimilarity`. Callers filter out `RenderedIcon.Failed` before calling it —
+malformed/unsupported icons are excluded from ranked output entirely rather than
+shown unscored, since there's nothing to compare them with.
+
+`IconLensToolWindowFactory` has two mutually exclusive display modes, tracked by
+a single `activeQueryImage: BufferedImage?`:
+
+- **Browse mode** (`activeQueryImage == null`): the pre-existing filename-filtered
+  gallery. The filter field is enabled.
+- **Ranked mode** (`activeQueryImage != null`): every renderable icon, reordered
+  best-match-first, filter field disabled and cleared. Loading a new query image
+  always fully replaces the previous ranked results — there's no combining rank
+  with a name filter, no top-N cap, and no score threshold.
+
+Both modes render through one `DefaultListModel<GalleryTile>`, where
+`GalleryTile(icon: RenderedIcon, score: Double?)` — `score` is `null` in browse
+mode and a `0.0..1.0` similarity in ranked mode. `IconTileRenderer` paints a
+percentage badge in the icon's corner only when `score != null`.
+
+Ranking runs on the same `Dispatchers.IO` scope the gallery load already uses —
+recomputed from scratch on every search and on every `Refresh` while a query is
+active. There is no persistent index or descriptor cache; that's `ROADMAP.md`
+M9 ("Incremental Indexing"), not this milestone. See
+`docs/superpowers/specs/2026-08-01-search-experience-design.md` for full
+rationale.

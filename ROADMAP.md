@@ -171,14 +171,24 @@ green.
 
 ## M7 — Search Experience
 
-Status: NOT STARTED
+Status: DONE
 
-- [ ] Display ranked matches
-- [ ] Display useful similarity indication
-- [ ] Display icon preview
-- [ ] Display resource name
-- [ ] Handle empty results
-- [ ] Handle search errors
+- [x] Display ranked matches
+- [x] Display useful similarity indication
+- [x] Display icon preview
+- [x] Display resource name
+- [x] Handle empty results
+- [x] Handle search errors
+
+Verified: `./gradlew build` and `./gradlew test` green after wiring
+`rankRenderedIcons` into `IconLensToolWindowFactory`'s query panel. Manually
+verified via `runIde`: pasting/choosing a query image re-ranks the gallery
+with percentage badges and disables the filter field; Clear returns to plain
+browse mode; Refresh mid-search stays in ranked mode; a failed query load
+(e.g. plain-text clipboard content) leaves the gallery untouched. See
+`docs/superpowers/specs/2026-08-01-search-experience-design.md` for the
+design and `ARCHITECTURE.md`'s "Search Experience (M7)" section for the
+implementation summary.
 
 ---
 
