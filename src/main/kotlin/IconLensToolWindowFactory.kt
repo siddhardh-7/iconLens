@@ -64,7 +64,7 @@ private fun paintCheckerboard(g: Graphics2D, width: Int, height: Int) {
     }
 }
 
-private data class GalleryTile(val icon: RenderedIcon, val score: Double?)
+internal data class GalleryTile(val icon: RenderedIcon, val score: Double?)
 
 private fun BufferedImage.scaledForPreview(): Image {
     if (width <= MAX_QUERY_PREVIEW_DIMENSION && height <= MAX_QUERY_PREVIEW_DIMENSION) return this
@@ -89,6 +89,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
             cellRenderer = IconTileRenderer()
             emptyText.text = IconLensBundle.message("toolwindow.IconLens.emptyText")
         }
+        installGalleryResourceActions(project, list)
 
         var allIcons: List<RenderedIcon> = emptyList()
 
