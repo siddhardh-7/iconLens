@@ -241,7 +241,7 @@ a display concern. See
 compact, comparable signature:
 
 ```kotlin
-data class IconDescriptor(val hash: Long)
+data class IconDescriptor(val hash: List<Long>)
 ```
 
 ```kotlin
@@ -259,12 +259,20 @@ the similarity algorithm to evolve later" requirement, it evolves as one unit,
 not two pieces that could drift out of sync.
 
 `DHashSimilarityEngine` is the only concrete implementation: a difference hash
-(dHash). `describe` resizes the 64x64 `NormalizedIcon.image` to 9x8 (bilinear,
-same technique `CenteredImageNormalizer` uses), converts to grayscale, and packs
-64 row-wise adjacent-pixel comparisons into a `Long`. `score` compares two
-hashes via Hamming distance (`java.lang.Long.bitCount(a.hash xor b.hash)`) into
-a `1.0` (identical) to `0.0` (every bit differs) range — the same shape as the
-percentage `PRD.md`/M7 will eventually display.
+(dHash). A single row-wise-only dHash over a small grid collapses most simple/
+flat icon shapes (badges, rings, glyphs) into near-identical hashes — most of a
+small bit budget ends up encoding "is there a roughly circular/rectangular
+shape here," which is true of nearly every icon, leaving too few bits for the
+actual distinguishing detail. To get more discriminative scores without any
+ML/cloud dependency, `describe` computes two directional hashes from the 64x64
+`NormalizedIcon.image` (bilinear resize, same technique `CenteredImageNormalizer`
+uses): a horizontal component (resize to 17x16, pack 16 row-wise adjacent-pixel
+comparisons per row × 16 rows = 256 bits) and a vertical component (resize to
+16x17, pack 16 column-wise adjacent-pixel comparisons per column × 16 columns =
+256 bits), concatenated into an 8-`Long`/512-bit `IconDescriptor.hash`. `score`
+compares two hashes via total Hamming distance across all 8 longs into a `1.0`
+(identical) to `0.0` (every bit differs) range — the same shape as the
+percentage `PRD.md`/M7 displays.
 
 ```kotlin
 data class ScoredMatch<T>(val candidate: T, val score: Double)
