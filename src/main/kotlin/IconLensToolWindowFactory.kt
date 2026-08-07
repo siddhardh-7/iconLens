@@ -22,11 +22,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Component
 import java.awt.Dimension
 import java.awt.Font
+import java.awt.Graphics
+import java.awt.Graphics2D
 import java.awt.Image
+import java.awt.RenderingHints
 import java.awt.image.BufferedImage
+import kotlin.math.roundToInt
 import javax.swing.BorderFactory
 import javax.swing.BoxLayout
 import javax.swing.DefaultListModel
@@ -43,6 +48,8 @@ import javax.swing.event.DocumentListener
 
 private const val MAX_QUERY_PREVIEW_DIMENSION = 128
 
+private data class GalleryTile(val icon: RenderedIcon, val score: Double?)
+
 private fun BufferedImage.scaledForPreview(): Image {
     if (width <= MAX_QUERY_PREVIEW_DIMENSION && height <= MAX_QUERY_PREVIEW_DIMENSION) return this
     val scale = MAX_QUERY_PREVIEW_DIMENSION.toDouble() / maxOf(width, height)
@@ -55,7 +62,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        val listModel = DefaultListModel<RenderedIcon>()
+        val listModel = DefaultListModel<GalleryTile>()
         val list = JBList(listModel).apply {
             layoutOrientation = JList.HORIZONTAL_WRAP
             visibleRowCount = 0
@@ -67,7 +74,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
 
         fun applyFilter(query: String) {
             listModel.clear()
-            filterByName(allIcons, query).forEach(listModel::addElement)
+            filterByName(allIcons, query).forEach { listModel.addElement(GalleryTile(it, null)) }
         }
 
         val filterField = JBTextField()
@@ -226,10 +233,10 @@ class IconLensToolWindowFactory : ToolWindowFactory {
     }
 }
 
-private class IconTileRenderer : ListCellRenderer<RenderedIcon> {
+private class IconTileRenderer : ListCellRenderer<GalleryTile> {
     override fun getListCellRendererComponent(
-        list: JList<out RenderedIcon>,
-        value: RenderedIcon,
+        list: JList<out GalleryTile>,
+        value: GalleryTile,
         index: Int,
         isSelected: Boolean,
         cellHasFocus: Boolean,
@@ -238,11 +245,36 @@ private class IconTileRenderer : ListCellRenderer<RenderedIcon> {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             border = BorderFactory.createEmptyBorder(8, 8, 8, 8)
         }
-        val icon = when (value) {
-            is RenderedIcon.Rendered -> ImageIcon(value.image)
+        val renderedIcon = value.icon
+        val icon = when (renderedIcon) {
+            is RenderedIcon.Rendered -> ImageIcon(renderedIcon.image)
             is RenderedIcon.Failed -> AllIcons.General.Warning
         }
-        val iconLabel = JLabel(icon).apply {
+        val score = value.score
+        val iconLabel = object : JLabel(icon) {
+            override fun paintComponent(g: Graphics) {
+                super.paintComponent(g)
+                if (score == null) return
+                val text = "${(score * 100).roundToInt()}%"
+                val g2 = g.create() as Graphics2D
+                try {
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    g2.font = font.deriveFont(Font.BOLD, 11f)
+                    val metrics = g2.fontMetrics
+                    val padding = 4
+                    val badgeWidth = metrics.stringWidth(text) + padding * 2
+                    val badgeHeight = metrics.height + padding
+                    val x = width - badgeWidth
+                    val y = height - badgeHeight
+                    g2.color = Color(0, 0, 0, 180)
+                    g2.fillRoundRect(x, y, badgeWidth, badgeHeight, 8, 8)
+                    g2.color = Color.WHITE
+                    g2.drawString(text, x + padding, y + metrics.ascent + padding / 2)
+                } finally {
+                    g2.dispose()
+                }
+            }
+        }.apply {
             alignmentX = Component.CENTER_ALIGNMENT
             horizontalAlignment = JLabel.CENTER
             verticalAlignment = JLabel.CENTER
@@ -251,11 +283,11 @@ private class IconTileRenderer : ListCellRenderer<RenderedIcon> {
             minimumSize = tileSize
             maximumSize = tileSize
         }
-        val nameLabel = JLabel(value.resource.name).apply {
+        val nameLabel = JLabel(renderedIcon.resource.name).apply {
             alignmentX = Component.CENTER_ALIGNMENT
             font = font.deriveFont(Font.BOLD)
         }
-        val typeLabel = JLabel("${value.resource.type} · ${value.resource.moduleName}").apply {
+        val typeLabel = JLabel("${renderedIcon.resource.type} · ${renderedIcon.resource.moduleName}").apply {
             alignmentX = Component.CENTER_ALIGNMENT
             font = font.deriveFont(Font.PLAIN, font.size2D - 1f)
             foreground = UIManager.getColor("Label.disabledForeground") ?: foreground
