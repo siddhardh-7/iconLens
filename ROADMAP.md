@@ -207,11 +207,22 @@ Status: DONE
 - [x] Copy resource name
 - [x] Copy `R.drawable.resource_name` where appropriate
 
-Verified: `./gradlew build` and `./gradlew test` green after adding
-`GalleryResourceActions.kt`'s right-click menu and double-click-to-open.
-Manually verified via `runIde`: all four actions work on both rendered and
-failed tiles, right-click always acts on the clicked tile, actions are
-disabled with no selection. See
+Verified: `./gradlew build` and `./gradlew test` green. Manual `runIde` UI
+checklist has now been run by a human against a real Android project
+(right-click menu, double-click-to-open, Reveal in Project View). Two real
+bugs surfaced during that pass and were fixed:
+
+- `PopupHandler.installSelectionListPopup` only shows the popup when the
+  right-clicked row is already the selected one (`ListUtil.isPointOnSelection`
+  gates it) — it never selects on right-click. A first right-click on any
+  not-yet-selected tile silently did nothing. Fixed by installing a plain
+  `PopupHandler` that selects the clicked row before showing the menu.
+- `ProjectView.select()` silently no-ops if the Project tool window has never
+  been shown in the session — "Reveal in Project View" only worked when the
+  Project view was already open. Fixed by activating the tool window first
+  (`ToolWindow.activate { ... }`) and calling `select()` in its callback.
+
+Copy Name / Copy Reference confirmed working via clipboard checks. See
 `docs/superpowers/specs/2026-08-07-resource-actions-design.md` for the
 design and `ARCHITECTURE.md`'s "Resource Actions (M8)" section for the
 implementation summary.

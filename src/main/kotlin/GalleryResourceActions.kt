@@ -1,6 +1,7 @@
 package io.github.siddhardh7.iconlens
 
 import com.intellij.ide.projectView.ProjectView
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -8,8 +9,12 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.ToolWindowId
+import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.components.JBList
+import java.awt.Component
+import java.awt.Point
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 
@@ -50,7 +55,15 @@ private class RevealInProjectViewAction(private val list: JBList<GalleryTile>) :
     override fun actionPerformed(e: AnActionEvent) {
         val resource = list.selectedResourceOrNull() ?: return
         if (!resource.file.isValid) return
-        ProjectView.getInstance(e.project ?: return).select(null, resource.file, true)
+        val project = e.project ?: return
+        // ProjectView.select() silently no-ops if the Project tool window has never been
+        // shown yet; activate it first so selection also works on a fresh IDE session.
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.PROJECT_VIEW)
+        if (toolWindow != null) {
+            toolWindow.activate { ProjectView.getInstance(project).select(null, resource.file, true) }
+        } else {
+            ProjectView.getInstance(project).select(null, resource.file, true)
+        }
     }
 }
 
@@ -92,7 +105,18 @@ internal fun installGalleryResourceActions(project: Project, list: JBList<Galler
         CopyResourceNameAction(list),
         CopyResourceReferenceAction(list),
     )
-    PopupHandler.installSelectionListPopup(list, group, "IconLens.GalleryPopup")
+    // PopupHandler.installSelectionListPopup only shows the menu when the clicked row is
+    // already selected (ListUtil.isPointOnSelection) — it never selects on right-click.
+    // Select the clicked row ourselves so a first right-click on any tile works.
+    list.addMouseListener(object : PopupHandler() {
+        override fun invokePopup(comp: Component, x: Int, y: Int) {
+            val index = list.locationToIndex(Point(x, y))
+            if (index != -1) list.selectedIndex = index
+            ActionManager.getInstance()
+                .createActionPopupMenu("IconLens.GalleryPopup", group)
+                .component.show(comp, x, y)
+        }
+    })
 
     list.addMouseListener(object : MouseAdapter() {
         override fun mouseClicked(e: MouseEvent) {

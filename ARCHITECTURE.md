@@ -344,7 +344,7 @@ double-click-to-open shortcut on the gallery's `JBList<GalleryTile>`,
 installed via `installGalleryResourceActions(project, list)`:
 
 ```kotlin
-fun installGalleryResourceActions(project: Project, list: JBList<GalleryTile>)
+internal fun installGalleryResourceActions(project: Project, list: JBList<GalleryTile>)
 ```
 
 Four `AnAction`s read the selected `GalleryTile.icon.resource`
