@@ -2,6 +2,7 @@ package io.github.siddhardh7.iconlens
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
+import kotlin.system.measureTimeMillis
 
 class DrawableIconSourceTest : BasePlatformTestCase() {
 
@@ -27,5 +28,21 @@ class DrawableIconSourceTest : BasePlatformTestCase() {
         val resources = runBlocking { DrawableIconSource(project).discover() }
 
         assertEquals(0, resources.size)
+    }
+
+    fun testDiscoversLargeResourceCollectionWithoutPathologicalSlowdown() {
+        repeat(500) { i ->
+            myFixture.tempDirFixture.createFile("res/drawable/ic_scale_$i.png", "")
+        }
+
+        val elapsedMillis = measureTimeMillis {
+            val resources = runBlocking { DrawableIconSource(project).discover() }
+            assertEquals(500, resources.size)
+        }
+
+        assertTrue(
+            "discover() of 500 real resources took ${elapsedMillis}ms, expected under 10000ms",
+            elapsedMillis < 10_000,
+        )
     }
 }
