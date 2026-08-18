@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.service
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
@@ -109,7 +110,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         fun refresh() {
             val queryAtRefreshTime = activeQueryImage
             scope.launch {
-                val rendered = loadGallery(DrawableIconSource(project), DrawableIconRenderer())
+                val rendered = project.service<IconIndex>().refresh(DrawableIconSource(project), DrawableIconRenderer())
                 val ranked = queryAtRefreshTime?.let {
                     rankRenderedIcons(rendered.filterIsInstance<RenderedIcon.Rendered>(), it, normalizer, engine)
                 }
