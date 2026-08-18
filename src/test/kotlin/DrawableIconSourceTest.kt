@@ -45,4 +45,13 @@ class DrawableIconSourceTest : BasePlatformTestCase() {
             elapsedMillis < 10_000,
         )
     }
+
+    fun testTagsResourcesWithTheirActualOwningModuleName() {
+        myFixture.tempDirFixture.createFile("res/drawable/ic_module_a.png", "")
+
+        val resources = runBlocking { DrawableIconSource(project).discover() }
+
+        assertEquals(1, resources.size)
+        assertEquals(myFixture.module.name, resources.single().moduleName)
+    }
 }
