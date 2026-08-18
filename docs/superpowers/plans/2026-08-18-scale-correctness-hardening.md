@@ -248,13 +248,37 @@ git commit -m "Add batch-level malformed-resource isolation test"
 
 ---
 
-### Task 4: Multi-module discovery test
+### Task 4: Module-name attribution test
+
+> **Amended after a BLOCKED first attempt** (see ledger `Task 4:` entries in
+> `.superpowers/sdd/2026-08-18-scale-correctness-hardening/progress.md`):
+> the original plan called for `PsiTestUtil.addModule` against
+> `DrawableIconSourceTest`, a `BasePlatformTestCase` **light** fixture.
+> `LightPlatformTestCase` installs a project-wide `ModuleListener` whose
+> `moduleAdded` unconditionally fails any light test that adds a module —
+> confirmed by disassembling `LightPlatformTestCase$2.class`
+> ("Adding modules is not permitted in light tests"). This is a hard
+> platform guard, not a workaround-able quirk. A genuine heavy-fixture
+> multi-module test is possible in principle
+> (`IdeaTestFixtureFactory.createFixtureBuilder(name).addModule(EmptyModuleFixtureBuilder::class.java).addContentRoot(path)`,
+> all verified present via bytecode) but is a heavier, more fragile,
+> multi-API-surface addition disproportionate to the actual risk: the
+> multi-module aggregation logic itself
+> (`ModuleManager.getInstance(project).modules.flatMap(::collectCandidatesForModule)`,
+> `DrawableIconSource.kt:21`) is a single-line `flatMap` with no
+> per-module-count branching to get wrong. This task instead adds a test
+> that locks in the real per-resource module-name *attribution* mechanism
+> (`collectDrawableDirs(file, module.name, candidates)`,
+> `DrawableIconSource.kt:34`) using the fixture's one real module — proving
+> resources are tagged with the module's actual name, not a hardcoded
+> stand-in — and the plan-wide multi-module iteration claim is closed via
+> the code inspection above rather than a second live module.
 
 **Files:**
 - Modify: `src/test/kotlin/DrawableIconSourceTest.kt`
 
 **Interfaces:**
-- Consumes: `DrawableIconSource(project).discover(): List<IconResource>` (existing, unchanged), `PsiTestUtil.addModule` and `EmptyModuleType.getInstance()` (platform APIs, see Global Constraints for verified signatures/behavior).
+- Consumes: `DrawableIconSource(project).discover(): List<IconResource>` (existing, unchanged).
 - Produces: nothing new consumed by later tasks; this is the final task in this plan.
 
 - [ ] **Step 1: Write the failing test**
@@ -262,36 +286,25 @@ git commit -m "Add batch-level malformed-resource isolation test"
 Add this test to the `DrawableIconSourceTest` class in `src/test/kotlin/DrawableIconSourceTest.kt` (add it as the last test in the class, right before the closing `}`):
 
 ```kotlin
-    fun testDiscoversResourcesAcrossMultipleModules() {
+    fun testTagsResourcesWithTheirActualOwningModuleName() {
         myFixture.tempDirFixture.createFile("res/drawable/ic_module_a.png", "")
-
-        val moduleBRoot = myFixture.tempDirFixture.findOrCreateDir("moduleB")
-        PsiTestUtil.addModule(project, EmptyModuleType.getInstance(), "moduleB", moduleBRoot)
-        myFixture.tempDirFixture.createFile("moduleB/res/drawable/ic_module_b.png", "")
 
         val resources = runBlocking { DrawableIconSource(project).discover() }
 
-        val byName = resources.associateBy { it.name }
-        assertEquals(2, resources.size)
-        assertEquals(myFixture.module.name, byName.getValue("ic_module_a").moduleName)
-        assertEquals("moduleB", byName.getValue("ic_module_b").moduleName)
+        assertEquals(1, resources.size)
+        assertEquals(myFixture.module.name, resources.single().moduleName)
     }
 ```
 
-Add these two imports to the existing import block at the top of the file:
-
-```kotlin
-import com.intellij.openapi.module.EmptyModuleType
-import com.intellij.testFramework.PsiTestUtil
-```
+No new imports needed — `runBlocking`/`assertEquals` are already imported/inherited in this file.
 
 - [ ] **Step 2: Run the test to verify it passes**
 
-This exercises the existing `ModuleManager.getInstance(project).modules.flatMap(::collectCandidatesForModule)` call in `DrawableIconSource.discover()`, which should already be correct — no implementation change is expected. Run:
+This exercises the existing `collectDrawableDirs(file, module.name, candidates)` attribution in `DrawableIconSource.kt:34`, which should already be correct — no implementation change is expected. Run:
 
 `./gradlew test --tests "io.github.siddhardh7.iconlens.DrawableIconSourceTest"`
 
-Expected: PASS (4/4 tests: the 2 original plus Task 2's and this one). If `moduleName` comes back wrong for either resource, or the second module's resources are missing entirely, that is a real bug in `DrawableIconSource.collectCandidatesForModule` — fix it before proceeding.
+Expected: PASS (4/4 tests: the 2 original plus Task 2's and this one). If `moduleName` doesn't match `myFixture.module.name`, that is a real bug in `DrawableIconSource.collectCandidatesForModule` — fix it before proceeding.
 
 - [ ] **Step 3: Run the full test suite and the plugin build**
 
@@ -343,12 +356,19 @@ Status: IN PROGRESS (1 of 3 sub-projects done)
 Sub-project 1 (Scale & Correctness Hardening) verified: `./gradlew build`
 and `./gradlew test` green, including a 1,000-synthetic-resource
 `IconIndex` scale test, a 500-real-file `DrawableIconSource` VFS-scale
-test, a batch-level malformed-resource isolation test, and a real
-multi-module discovery test — all passing with no production code
-changes needed (existing pipeline held up as designed). UI
-responsiveness evidence comes from these same tests running off the
-EDT within their time budgets; no EDT-blocking call was found or
-introduced. See
+test, a batch-level malformed-resource isolation test, and a
+module-name-attribution test confirming resources are tagged with their
+real owning module's name — all passing with no production code changes
+needed (existing pipeline held up as designed). Multi-module *iteration*
+(discovering across 2+ modules, not just attribution) is verified by code
+inspection rather than a live second-module test: `BasePlatformTestCase`
+(the light fixture this suite's tests use) categorically disallows adding
+a module mid-test (platform-enforced), and `DrawableIconSource.discover()`'s
+multi-module aggregation is a single-line
+`ModuleManager.getInstance(project).modules.flatMap(::collectCandidatesForModule)`
+with no per-module-count branching to get wrong. UI responsiveness
+evidence comes from the scale tests running off the EDT within their time
+budgets; no EDT-blocking call was found or introduced. See
 `docs/superpowers/specs/2026-08-18-scale-correctness-hardening-design.md`
 for the design. Remaining M10 sub-projects: Lifecycle & Memory Review,
 Release Packaging.
