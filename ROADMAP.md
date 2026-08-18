@@ -231,14 +231,24 @@ implementation summary.
 
 ## M9 — Incremental Indexing
 
-Status: NOT STARTED
+Status: DONE
 
-- [ ] Detect relevant resource changes
-- [ ] Add new resources
-- [ ] Update changed resources
-- [ ] Remove deleted resources
-- [ ] Avoid unnecessary full re-indexing
-- [ ] Respect project lifecycle
+- [x] Detect relevant resource changes
+- [x] Add new resources
+- [x] Update changed resources
+- [x] Remove deleted resources
+- [x] Avoid unnecessary full re-indexing
+- [x] Respect project lifecycle
+
+Verified: `./gradlew build` and `./gradlew test` green, including
+`IconIndexTest`'s coverage of add/update/remove/reuse/representative-swap
+cases. Manually verified via `runIde`: adding, renaming, editing, and
+deleting drawable resources are all reflected correctly on the next
+Refresh click. Scoped to discovery+rendering only — no automatic
+(listener-driven) refresh and no descriptor caching in this milestone; see
+`docs/superpowers/specs/2026-08-10-incremental-indexing-design.md` for the
+full design and `ARCHITECTURE.md`'s "Incremental Indexing (M9)" section for
+the implementation summary.
 
 ---
 

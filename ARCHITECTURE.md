@@ -364,3 +364,41 @@ file (deleted/moved since the last gallery load) rather than throwing;
 Copy Name/Reference only read the already-extracted `resource.name`
 string, so they don't need that guard. No multi-select batching and no
 clipboard-copy confirmation UI in V0.1.
+
+---
+
+# Incremental Indexing (M9)
+
+`IconIndex` (`IconIndex.kt`) is a project-level service —
+`@Service(Service.Level.PROJECT)`, retrieved via `project.service<IconIndex>()`
+— that caches the last-rendered `RenderedIcon` per resource so
+`IconLensToolWindowFactory.kt`'s `refresh()` only re-renders what actually
+changed:
+
+```kotlin
+@Service(Service.Level.PROJECT)
+class IconIndex {
+    suspend fun refresh(source: IconSource, renderer: IconRenderer): List<RenderedIcon>
+}
+```
+
+Entries are keyed by `(moduleName, name)` rather than by `VirtualFile`,
+because `DrawableRepresentativePicker` (M2) can pick a different file as the
+representative for the same logical resource between two refreshes (e.g. a
+higher-density variant is added) — keying by name keeps that an *update* to
+one cache entry rather than an implicit delete-and-add. `discover()` still
+runs in full on every refresh (it's a cheap VFS walk, and the only way to
+notice additions and deletions); only rendering is skipped, and only when a
+resource's `VirtualFile` and `modificationStamp` both match what's cached. A
+`Mutex` around the whole discover-diff-update sequence keeps overlapping
+`refresh()` calls sequential rather than racing on the shared cache.
+
+`IconGalleryModel.kt`'s `loadGallery()` — the previous stateless
+discover-and-render-everything function — is gone; `IconIndex.refresh` is
+its replacement and sole caller's entry point now.
+
+Explicitly out of scope for M9: automatic refresh on file change (no VFS/PSI
+listeners — refresh is still a manual, button-triggered action), caching
+`IconDescriptor`s for ranking (`SimilarityRanking.kt` is unchanged), and
+persisting the index to disk (in-memory only, for the life of the project
+session).
