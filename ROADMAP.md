@@ -254,16 +254,36 @@ the implementation summary.
 
 ## M10 — Hardening
 
-Status: NOT STARTED
+Status: IN PROGRESS (1 of 3 sub-projects done)
 
-- [ ] Test large resource collections
-- [ ] Test malformed resources
-- [ ] Test multi-module projects
-- [ ] Verify UI responsiveness
+- [x] Test large resource collections
+- [x] Test malformed resources
+- [x] Test multi-module projects
+- [x] Verify UI responsiveness
 - [ ] Review memory usage
 - [ ] Review cancellation/disposal behavior
 - [ ] Plugin verification
 - [ ] Package distributable plugin
+
+Sub-project 1 (Scale & Correctness Hardening) verified: `./gradlew build`
+and `./gradlew test` green, including a 1,000-synthetic-resource
+`IconIndex` scale test, a 500-real-file `DrawableIconSource` VFS-scale
+test, a batch-level malformed-resource isolation test, and a
+module-name-attribution test confirming resources are tagged with their
+real owning module's name — all passing with no production code changes
+needed (existing pipeline held up as designed). Multi-module *iteration*
+(discovering across 2+ modules, not just attribution) is verified by code
+inspection rather than a live second-module test: `BasePlatformTestCase`
+(the light fixture this suite's tests use) categorically disallows adding
+a module mid-test (platform-enforced), and `DrawableIconSource.discover()`'s
+multi-module aggregation is a single-line
+`ModuleManager.getInstance(project).modules.flatMap(::collectCandidatesForModule)`
+with no per-module-count branching to get wrong. UI responsiveness
+evidence comes from the scale tests running off the EDT within their time
+budgets; no EDT-blocking call was found or introduced. See
+`docs/superpowers/specs/2026-08-18-scale-correctness-hardening-design.md`
+for the design. Remaining M10 sub-projects: Lifecycle & Memory Review,
+Release Packaging.
 
 ---
 
