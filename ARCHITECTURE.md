@@ -29,13 +29,13 @@ IconRenderer
 ↓
 RenderedIcon
 ↓
+IconIndex
+↓
 ImageNormalizer
 ↓
 NormalizedIcon
 ↓
 IconDescriptor
-↓
-IconIndex
 ↓
 SimilarityEngine
 ↓

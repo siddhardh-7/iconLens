@@ -1,7 +1,6 @@
 package io.github.siddhardh7.iconlens
 
 import com.intellij.testFramework.LightVirtualFile
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -34,15 +33,6 @@ class IconGalleryModelTest {
         g.fillRect(splitAt, 0, 64 - splitAt, 64)
         g.dispose()
         return image
-    }
-
-    private class FakeIconSource(private val resources: List<IconResource>) : IconSource {
-        override suspend fun discover() = resources
-    }
-
-    private class FakeIconRenderer : IconRenderer {
-        override suspend fun render(resource: IconResource) =
-            RenderedIcon.Rendered(resource, BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB))
     }
 
     @Test

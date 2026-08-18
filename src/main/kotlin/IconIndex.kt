@@ -19,14 +19,15 @@ class IconIndex {
         for (resource in discovered) {
             val key = ResourceKey(resource.moduleName, resource.name)
             val existing = cache[key]
+            val modificationStamp = resource.file.modificationStamp
             val icon = if (existing != null && existing.file == resource.file &&
-                existing.modificationStamp == resource.file.modificationStamp
+                existing.modificationStamp == modificationStamp
             ) {
                 existing.icon
             } else {
                 renderer.render(resource)
             }
-            updated[key] = CachedEntry(icon, resource.file, resource.file.modificationStamp)
+            updated[key] = CachedEntry(icon, resource.file, modificationStamp)
         }
         cache = updated
         updated.values.map { it.icon }
