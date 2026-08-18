@@ -13,26 +13,33 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.content.ContentFactory
+import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.awt.BasicStroke
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
+import java.awt.Container
 import java.awt.Dimension
 import java.awt.Font
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Image
+import java.awt.LayoutManager
 import java.awt.RenderingHints
+import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
 import kotlin.math.roundToInt
+import javax.swing.Box
 import javax.swing.BorderFactory
 import javax.swing.BoxLayout
 import javax.swing.DefaultListModel
@@ -137,21 +144,22 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         }
         toolWindow.setTitleActions(listOf(refreshAction))
 
-        val queryPreviewLabel = JLabel(IconLensBundle.message("toolwindow.IconLens.queryEmpty")).apply {
+        val queryDropZone = QueryDropZone()
+        val querySourceLabel = JLabel(" ").apply {
+            alignmentX = Component.CENTER_ALIGNMENT
             horizontalAlignment = JLabel.CENTER
+            font = font.deriveFont(Font.PLAIN, font.size2D - 1f)
+            foreground = UIManager.getColor("Label.disabledForeground") ?: foreground
         }
-        val querySourceLabel = JLabel(" ")
 
         fun showQueryImage(result: QueryImage) {
             when (result) {
                 is QueryImage.Loaded -> {
-                    queryPreviewLabel.icon = ImageIcon(result.image.scaledForPreview())
-                    queryPreviewLabel.text = null
+                    queryDropZone.showImage(result.image.scaledForPreview())
                     querySourceLabel.text = result.sourceDescription
                 }
                 is QueryImage.Failed -> {
-                    queryPreviewLabel.icon = AllIcons.General.Warning
-                    queryPreviewLabel.text = null
+                    queryDropZone.showError()
                     querySourceLabel.text = result.reason
                 }
             }
@@ -188,8 +196,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
             latestRequestId++
             activeQueryImage = null
             filterField.isEnabled = true
-            queryPreviewLabel.icon = null
-            queryPreviewLabel.text = IconLensBundle.message("toolwindow.IconLens.queryEmpty")
+            queryDropZone.showEmpty()
             querySourceLabel.text = " "
             filterField.text = ""
             applyFilter(filterField.text)
@@ -234,23 +241,34 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         }
 
         querySourceLabel.transferHandler = queryDropHandler
+        queryDropZone.transferHandler = queryDropHandler
 
-        val queryPreviewArea = JPanel(BorderLayout()).apply {
-            add(queryPreviewLabel, BorderLayout.CENTER)
+        val queryPreviewPanel = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            queryDropZone.alignmentX = Component.CENTER_ALIGNMENT
+            add(queryDropZone)
+            add(Box.createVerticalStrut(JBUI.scale(4)))
+            add(querySourceLabel)
             transferHandler = queryDropHandler
         }
 
         val queryButtonsPanel = JPanel().apply {
-            add(pasteButton)
-            add(chooseFileButton)
-            add(clearButton)
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            val buttons = listOf(pasteButton, chooseFileButton, clearButton)
+            val buttonWidth = buttons.maxOf { it.preferredSize.width }
+            buttons.forEachIndexed { index, button ->
+                button.alignmentX = Component.LEFT_ALIGNMENT
+                button.maximumSize = Dimension(buttonWidth, button.preferredSize.height)
+                add(button)
+                if (index != buttons.lastIndex) add(Box.createVerticalStrut(JBUI.scale(6)))
+            }
             transferHandler = queryDropHandler
         }
 
-        val queryPanel = JPanel(BorderLayout()).apply {
-            add(queryPreviewArea, BorderLayout.CENTER)
-            add(querySourceLabel, BorderLayout.SOUTH)
-            add(queryButtonsPanel, BorderLayout.EAST)
+        val queryPanel = JPanel(QueryRowLayout(JBUI.scale(16))).apply {
+            border = BorderFactory.createEmptyBorder(JBUI.scale(8), JBUI.scale(8), JBUI.scale(8), JBUI.scale(8))
+            add(queryPreviewPanel)
+            add(queryButtonsPanel)
             transferHandler = queryDropHandler
         }
 
@@ -281,6 +299,142 @@ class IconLensToolWindowFactory : ToolWindowFactory {
         )
 
         refresh()
+    }
+}
+
+private val QUERY_DROP_ZONE_HEIGHT = JBUI.scale(MAX_QUERY_PREVIEW_DIMENSION + 16)
+private val QUERY_DROP_ZONE_MAX_WIDTH = QUERY_DROP_ZONE_HEIGHT * 4
+private val QUERY_DROP_ZONE_DASH = floatArrayOf(JBUI.scale(6).toFloat(), JBUI.scale(5).toFloat())
+
+/**
+ * Lays out exactly two children: a drop-zone block (index 0) sized dynamically between
+ * [QUERY_DROP_ZONE_HEIGHT] and [QUERY_DROP_ZONE_MAX_WIDTH], and a button column (index 1) docked
+ * to its right. The button column is hidden — never wrapped — once there isn't room for both.
+ */
+private class QueryRowLayout(private val gap: Int) : LayoutManager {
+    override fun addLayoutComponent(name: String?, comp: Component) = Unit
+    override fun removeLayoutComponent(comp: Component) = Unit
+
+    override fun minimumLayoutSize(parent: Container): Dimension = preferredLayoutSize(parent)
+
+    override fun preferredLayoutSize(parent: Container): Dimension {
+        val insets = parent.insets
+        val dropZone = parent.getComponent(0)
+        val height = maxOf(dropZone.preferredSize.height, QUERY_DROP_ZONE_HEIGHT)
+        return Dimension(insets.left + insets.right + QUERY_DROP_ZONE_HEIGHT, insets.top + insets.bottom + height)
+    }
+
+    override fun layoutContainer(parent: Container) {
+        val insets = parent.insets
+        val availableWidth = parent.width - insets.left - insets.right
+        val dropZone = parent.getComponent(0)
+        val buttons = parent.getComponent(1)
+
+        val buttonsWidth = buttons.preferredSize.width
+        val fitsButtons = availableWidth >= QUERY_DROP_ZONE_HEIGHT + gap + buttonsWidth
+        buttons.isVisible = fitsButtons
+
+        val dropZoneWidth = if (fitsButtons) {
+            (availableWidth - gap - buttonsWidth).coerceIn(QUERY_DROP_ZONE_HEIGHT, QUERY_DROP_ZONE_MAX_WIDTH)
+        } else {
+            availableWidth.coerceIn(0, QUERY_DROP_ZONE_MAX_WIDTH)
+        }
+        val rowContentWidth = dropZoneWidth + if (fitsButtons) gap + buttonsWidth else 0
+        val startX = insets.left + maxOf(0, (availableWidth - rowContentWidth) / 2)
+
+        val dropZoneHeight = dropZone.preferredSize.height
+        val rowHeight = maxOf(dropZoneHeight, if (fitsButtons) buttons.preferredSize.height else 0)
+        dropZone.setBounds(startX, insets.top + (rowHeight - dropZoneHeight) / 2, dropZoneWidth, dropZoneHeight)
+
+        if (fitsButtons) {
+            val buttonsHeight = buttons.preferredSize.height
+            buttons.setBounds(
+                startX + dropZoneWidth + gap,
+                insets.top + (rowHeight - buttonsHeight) / 2,
+                buttonsWidth,
+                buttonsHeight,
+            )
+        }
+    }
+}
+
+private sealed interface QueryDropZoneState {
+    data object Empty : QueryDropZoneState
+    data object Error : QueryDropZoneState
+    data class Preview(val image: Image) : QueryDropZoneState
+}
+
+/** Drop target with a fixed height that stretches to fill available width, capped at 4x its height. */
+private class QueryDropZone : JPanel() {
+    private var state: QueryDropZoneState = QueryDropZoneState.Empty
+
+    init {
+        preferredSize = Dimension(QUERY_DROP_ZONE_HEIGHT, QUERY_DROP_ZONE_HEIGHT)
+        minimumSize = Dimension(QUERY_DROP_ZONE_HEIGHT, QUERY_DROP_ZONE_HEIGHT)
+        maximumSize = Dimension(QUERY_DROP_ZONE_MAX_WIDTH, QUERY_DROP_ZONE_HEIGHT)
+    }
+
+    fun showImage(image: Image) {
+        state = QueryDropZoneState.Preview(image)
+        repaint()
+    }
+
+    fun showError() {
+        state = QueryDropZoneState.Error
+        repaint()
+    }
+
+    fun showEmpty() {
+        state = QueryDropZoneState.Empty
+        repaint()
+    }
+
+    override fun paintComponent(g: Graphics) {
+        super.paintComponent(g)
+        val g2 = g.create() as Graphics2D
+        try {
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            when (val current = state) {
+                is QueryDropZoneState.Preview -> paintPreview(g2, current.image)
+                QueryDropZoneState.Error -> paintPlaceholder(g2, AllIcons.General.Warning)
+                QueryDropZoneState.Empty -> paintPlaceholder(g2, AllIcons.FileTypes.Image)
+            }
+            paintDashedBorder(g2)
+        } finally {
+            g2.dispose()
+        }
+    }
+
+    private fun paintPreview(g2: Graphics2D, image: Image) {
+        paintCheckerboard(g2, width, height)
+        val iw = image.getWidth(this)
+        val ih = image.getHeight(this)
+        if (iw <= 0 || ih <= 0) return
+        val scale = minOf(width.toDouble() / iw, height.toDouble() / ih, 1.0)
+        val dw = (iw * scale).roundToInt()
+        val dh = (ih * scale).roundToInt()
+        g2.drawImage(image, (width - dw) / 2, (height - dh) / 2, dw, dh, this)
+    }
+
+    private fun paintPlaceholder(g2: Graphics2D, icon: javax.swing.Icon) {
+        val hintText = IconLensBundle.message("toolwindow.IconLens.queryEmpty")
+        val gap = JBUI.scale(6)
+        val metrics = g2.getFontMetrics(font)
+        val textWidth = metrics.stringWidth(hintText)
+        val blockHeight = icon.iconHeight + gap + metrics.height
+        val iconX = (width - icon.iconWidth) / 2
+        val iconY = (height - blockHeight) / 2
+        icon.paintIcon(this, g2, iconX, iconY)
+        g2.color = UIManager.getColor("Label.disabledForeground") ?: foreground
+        g2.drawString(hintText, (width - textWidth) / 2, iconY + icon.iconHeight + gap + metrics.ascent)
+    }
+
+    private fun paintDashedBorder(g2: Graphics2D) {
+        g2.stroke = BasicStroke(JBUI.scale(1.5f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0f, QUERY_DROP_ZONE_DASH, 0f)
+        g2.color = JBColor.border()
+        val inset = JBUI.scale(1).toFloat()
+        val arc = JBUI.scale(14).toFloat()
+        g2.draw(RoundRectangle2D.Float(inset, inset, width - inset * 2, height - inset * 2, arc, arc))
     }
 }
 
