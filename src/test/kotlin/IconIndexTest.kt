@@ -4,8 +4,10 @@ import com.intellij.testFramework.LightVirtualFile
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.awt.image.BufferedImage
+import kotlin.system.measureTimeMillis
 
 class IconIndexTest {
 
@@ -120,5 +122,21 @@ class IconIndexTest {
         assertEquals(1, second.size)
         assertEquals(2, renderer.renderCounts["ic_calendar"])
         assertEquals(newRepresentativeFile, second[0].resource.file)
+    }
+
+    @Test
+    fun `refresh scales to 1000 resources within a time budget`() {
+        val renderer = CountingRenderer()
+        val resources = (1..1000).map { resource("ic_$it") }
+
+        val elapsedMillis = measureTimeMillis {
+            val result = runBlocking { IconIndex().refresh(FakeIconSource(resources), renderer) }
+            assertEquals(1000, result.size)
+        }
+
+        assertTrue(
+            "refresh of 1000 resources took ${elapsedMillis}ms, expected under 2000ms",
+            elapsedMillis < 2000,
+        )
     }
 }
