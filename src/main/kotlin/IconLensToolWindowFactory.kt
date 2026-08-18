@@ -192,6 +192,7 @@ class IconLensToolWindowFactory : ToolWindowFactory {
             queryPreviewLabel.text = IconLensBundle.message("toolwindow.IconLens.queryEmpty")
             querySourceLabel.text = " "
             filterField.text = ""
+            applyFilter(filterField.text)
         }
 
         val pasteButton = JButton(IconLensBundle.message("toolwindow.IconLens.paste")).apply {
