@@ -1,7 +1,12 @@
 package io.github.siddhardh7.iconlens
 
 import com.intellij.testFramework.LightVirtualFile
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -138,5 +143,24 @@ class IconIndexTest {
             "refresh of 1000 resources took ${elapsedMillis}ms, expected under 2000ms",
             elapsedMillis < 2000,
         )
+    }
+
+    @Test
+    fun `cancelling a refresh releases the mutex for the next refresh`() = runBlocking {
+        val index = IconIndex()
+        val hangingRenderer = object : IconRenderer {
+            override suspend fun render(resource: IconResource): RenderedIcon = awaitCancellation()
+        }
+
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            index.refresh(FakeIconSource(listOf(resource("ic_calendar"))), hangingRenderer)
+        }
+        job.cancelAndJoin()
+
+        val result = withTimeout(2000) {
+            index.refresh(FakeIconSource(listOf(resource("ic_calendar"))), CountingRenderer())
+        }
+
+        assertEquals(1, result.size)
     }
 }

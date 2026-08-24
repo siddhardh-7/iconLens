@@ -402,3 +402,50 @@ listeners — refresh is still a manual, button-triggered action), caching
 `IconDescriptor`s for ranking (`SimilarityRanking.kt` is unchanged), and
 persisting the index to disk (in-memory only, for the life of the project
 session).
+
+
+---
+
+# Lifecycle & Disposal (M10)
+
+`IconLensToolWindowFactory.kt`'s `createToolWindowContent` creates one
+`CoroutineScope(SupervisorJob() + Dispatchers.IO)` per tool window content
+and a `contentDisposed` flag, both closed over by `refresh()` and
+`loadAndShow()`'s async work. `Disposer.register(content, Disposable {
+contentDisposed = true; scope.cancel() })` ties both to the `Content`'s
+platform-managed lifecycle (which IntelliJ disposes on tool window content
+removal, including project close) — cancellation and the disposed-flag
+flip happen atomically from that single callback. Both `refresh()` and
+`loadAndShow()` check `contentDisposed` inside their `invokeLater` block
+before touching any UI state (`listModel`, `allIcons`, `activeQueryImage`),
+so a coroutine already in flight when disposal happens cannot mutate UI
+state afterward.
+
+`IconIndex`'s cache is memory-bounded by construction, not by an explicit
+limit: it's rebuilt from `discover()`'s result on every `refresh()`, so any
+cache entry whose key isn't in the current discovery pass is simply not
+carried into the new map — a deleted drawable's `RenderedIcon`/
+`BufferedImage` becomes unreachable the moment the next refresh runs.
+`IconIndexTest`'s "a resource no longer discovered is dropped from the
+result" case (M9) is this guarantee's regression test.
+
+`IconIndex.refresh()`'s `Mutex` (M9) is cancellation-safe: cancelling a
+`refresh()` call while it's suspended inside `mutex.withLock { ... }`
+releases the lock rather than leaving it held, so a cancelled refresh (e.g.
+the user closes the project mid-refresh) never deadlocks a subsequent one.
+Locked in by `IconIndexTest`'s "cancelling a refresh releases the mutex for
+the next refresh" case (M10).
+
+`installGalleryResourceActions` (`GalleryResourceActions.kt`, M8) attaches
+its `PopupHandler`/`MouseAdapter` listeners directly to the gallery's
+`JBList` with no external retention (no static registry, no service
+holding a reference) — both become unreachable together with the list when
+its containing `Content` is discarded, standard Swing listener lifecycle.
+
+No bug was found during this review; see
+`docs/superpowers/specs/2026-08-19-lifecycle-memory-review-design.md` for
+the full audit reasoning and why the `Disposer`/`contentDisposed` wiring
+itself is documented rather than covered by a new automated test (it lives
+inside Swing-construction code; testing it directly would need a heavy
+IntelliJ UI test fixture, the same cost/fragility tradeoff that ruled out a
+live multi-module test in M10 sub-project 1).
