@@ -254,14 +254,14 @@ the implementation summary.
 
 ## M10 — Hardening
 
-Status: IN PROGRESS (1 of 3 sub-projects done)
+Status: IN PROGRESS (2 of 3 sub-projects done)
 
 - [x] Test large resource collections
 - [x] Test malformed resources
 - [x] Test multi-module projects
 - [x] Verify UI responsiveness
-- [ ] Review memory usage
-- [ ] Review cancellation/disposal behavior
+- [x] Review memory usage
+- [x] Review cancellation/disposal behavior
 - [ ] Plugin verification
 - [ ] Package distributable plugin
 
@@ -282,7 +282,20 @@ with no per-module-count branching to get wrong. UI responsiveness
 evidence comes from the scale tests running off the EDT within their time
 budgets; no EDT-blocking call was found or introduced. See
 `docs/superpowers/specs/2026-08-18-scale-correctness-hardening-design.md`
-for the design. Remaining M10 sub-projects: Lifecycle & Memory Review,
+for the design.
+
+Sub-project 2 (Lifecycle & Memory Review) verified: `./gradlew build` and
+`./gradlew test` green, including a new `IconIndexTest` case proving a
+cancelled `refresh()` doesn't leave its `Mutex` locked for the next call.
+No bug found. The `Disposer`/`contentDisposed` wiring in
+`IconLensToolWindowFactory.kt`, `IconIndex`'s memory bound, and
+`installGalleryResourceActions`'s listener retention were reviewed by code
+inspection rather than new automated tests — see `ARCHITECTURE.md`'s
+"Lifecycle & Disposal (M10)" section for the full trace and
+`docs/superpowers/specs/2026-08-19-lifecycle-memory-review-design.md` for
+why (testing the Swing-construction wiring directly would need a heavy
+IntelliJ UI test fixture, the same cost/fragility tradeoff that ruled out
+a live multi-module test in sub-project 1). Remaining M10 sub-project:
 Release Packaging.
 
 ---
