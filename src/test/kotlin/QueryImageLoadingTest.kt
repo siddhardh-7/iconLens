@@ -217,4 +217,36 @@ class QueryImageLoadingTest {
 
         assertEquals(null, result)
     }
+
+    /** Throws like a real drop's Transferable does once the drop callback has returned. */
+    private class ExpiringTransferable(
+        private val flavor: java.awt.datatransfer.DataFlavor,
+        private val data: Any,
+    ) : java.awt.datatransfer.Transferable {
+        private var reads = 0
+        override fun getTransferDataFlavors() = arrayOf(flavor)
+        override fun isDataFlavorSupported(f: java.awt.datatransfer.DataFlavor) = f == flavor
+        override fun getTransferData(f: java.awt.datatransfer.DataFlavor): Any {
+            reads++
+            if (reads > 1) throw java.awt.dnd.InvalidDnDOperationException("transferable expired")
+            return data
+        }
+    }
+
+    @Test
+    fun `queryImageFromTransferPayload decodes without reading an already-consumed transferable again`() {
+        val image = BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB)
+        val transferable = ExpiringTransferable(java.awt.datatransfer.DataFlavor.imageFlavor, image)
+
+        // The synchronous read a drop's TransferHandler.importData must do immediately.
+        val payload = readQueryTransferPayload(transferable)
+        assertTrue(payload is QueryTransferPayload.RawImage)
+
+        // Decoding runs later (e.g. on a background coroutine); by then a real drop's
+        // Transferable would throw InvalidDnDOperationException on any further read. Decoding
+        // must not need one.
+        val result = queryImageFromTransferPayload(payload!!, "Dropped image")
+
+        assertTrue(result is QueryImage.Loaded)
+    }
 }

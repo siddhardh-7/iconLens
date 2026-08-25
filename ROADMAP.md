@@ -187,11 +187,14 @@ into `val`s before crossing into `Dispatchers.IO` coroutines), the
 guard/ordering sequencing (browse↔ranked mode switching), and the
 `RenderedIcon.Failed`-exclusion from ranked output were verified by tracing
 every read/write site in the diff. Manual `runIde` verification of the
-visible behavior (pasting/choosing a query image re-ranks the gallery with
-percentage badges and disables the filter field; Clear returns to plain
-browse mode; Refresh mid-search stays in ranked mode; a failed query load
-leaves the gallery untouched) is still pending — run this checklist before
-relying on the UI behavior in production. See
+visible behavior has now been run: pasting/choosing a query image re-ranks
+the gallery with percentage badges and disables the filter field; Clear
+returns to plain browse mode; Refresh mid-search stays in ranked mode; a
+failed query load leaves the gallery untouched. A drag-and-drop-specific bug
+(`InvalidDnDOperationException` from decoding the `Transferable` outside the
+synchronous `importData` call) was found and fixed during this pass — see
+`QueryImageLoading.kt`'s `readQueryTransferPayload`/
+`queryImageFromTransferPayload` split. See
 `docs/superpowers/specs/2026-08-01-search-experience-design.md` for the
 design and `ARCHITECTURE.md`'s "Search Experience (M7)" section for the
 implementation summary.

@@ -235,7 +235,15 @@ class IconLensToolWindowFactory : ToolWindowFactory {
 
             override fun importData(support: TransferSupport): Boolean {
                 if (!canImport(support)) return false
-                loadAndShow { loadQueryImageFromTransferable(support.transferable, "Dropped image") }
+                // Must read the payload here, synchronously: a drop's Transferable is only
+                // valid for this call's duration (see readQueryTransferPayload's kdoc).
+                val payload = try {
+                    readQueryTransferPayload(support.transferable)
+                } catch (e: Exception) {
+                    loadAndShow { QueryImage.Failed(e.message ?: e.javaClass.simpleName) }
+                    return true
+                } ?: return false
+                loadAndShow { queryImageFromTransferPayload(payload, "Dropped image") }
                 return true
             }
         }

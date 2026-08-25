@@ -51,37 +51,61 @@ private fun loadQueryImageFromMarkup(text: String, sourceDescription: String): Q
 val SUPPORTED_TRANSFERABLE_FLAVORS =
     listOf(DataFlavor.imageFlavor, DataFlavor.javaFileListFlavor, DataFlavor.stringFlavor)
 
+/** The flavor-specific payload pulled out of a [Transferable], before any decoding. */
+sealed interface QueryTransferPayload {
+    data class RawImage(val image: Image) : QueryTransferPayload
+    data class Files(val files: List<File>) : QueryTransferPayload
+    data class Text(val text: String) : QueryTransferPayload
+}
+
+/**
+ * Reads a [Transferable]'s flavor payload. For a drag-and-drop `TransferHandler.TransferSupport`,
+ * this MUST be called synchronously inside `importData` — a drop's `Transferable` is only valid
+ * for that call's duration (Swing calls `dropComplete()` right after `importData` returns), so
+ * deferring this to a coroutine throws `java.awt.dnd.InvalidDnDOperationException`. The heavier
+ * decode step ([queryImageFromTransferPayload]) has no such constraint and can run async.
+ */
+fun readQueryTransferPayload(transferable: Transferable): QueryTransferPayload? = when {
+    transferable.isDataFlavorSupported(DataFlavor.imageFlavor) ->
+        QueryTransferPayload.RawImage(transferable.getTransferData(DataFlavor.imageFlavor) as Image)
+    transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) -> {
+        @Suppress("UNCHECKED_CAST")
+        QueryTransferPayload.Files(transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<File>)
+    }
+    transferable.isDataFlavorSupported(DataFlavor.stringFlavor) ->
+        QueryTransferPayload.Text(transferable.getTransferData(DataFlavor.stringFlavor) as String)
+    else -> null
+}
+
+fun queryImageFromTransferPayload(payload: QueryTransferPayload, imageSourceDescription: String): QueryImage? =
+    try {
+        when (payload) {
+            is QueryTransferPayload.RawImage ->
+                QueryImage.Loaded(payload.image.toBufferedImage(), imageSourceDescription)
+            is QueryTransferPayload.Files -> {
+                val first = payload.files.firstOrNull()
+                if (first == null) QueryImage.Failed("No files in drop") else loadQueryImageFromFile(first)
+            }
+            is QueryTransferPayload.Text -> loadQueryImageFromMarkup(payload.text, imageSourceDescription)
+        }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        QueryImage.Failed(e.message ?: e.javaClass.simpleName)
+    }
+
 fun loadQueryImageFromTransferable(
     transferable: Transferable,
     imageSourceDescription: String = "Pasted image",
-): QueryImage? = when {
-    transferable.isDataFlavorSupported(DataFlavor.imageFlavor) -> try {
-        val awtImage = transferable.getTransferData(DataFlavor.imageFlavor) as Image
-        QueryImage.Loaded(awtImage.toBufferedImage(), imageSourceDescription)
+): QueryImage? {
+    val payload = try {
+        readQueryTransferPayload(transferable)
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (e: Exception) {
-        QueryImage.Failed(e.message ?: e.javaClass.simpleName)
-    }
-    transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) -> try {
-        @Suppress("UNCHECKED_CAST")
-        val files = transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<File>
-        val first = files.firstOrNull()
-        if (first == null) QueryImage.Failed("No files in drop") else loadQueryImageFromFile(first)
-    } catch (e: kotlinx.coroutines.CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        QueryImage.Failed(e.message ?: e.javaClass.simpleName)
-    }
-    transferable.isDataFlavorSupported(DataFlavor.stringFlavor) -> try {
-        val text = transferable.getTransferData(DataFlavor.stringFlavor) as String
-        loadQueryImageFromMarkup(text, imageSourceDescription)
-    } catch (e: kotlinx.coroutines.CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        QueryImage.Failed(e.message ?: e.javaClass.simpleName)
-    }
-    else -> null
+        return QueryImage.Failed(e.message ?: e.javaClass.simpleName)
+    } ?: return null
+    return queryImageFromTransferPayload(payload, imageSourceDescription)
 }
 
 fun loadQueryImageFromClipboard(): QueryImage? {
